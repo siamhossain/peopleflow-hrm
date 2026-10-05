@@ -1,5 +1,5 @@
-import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
+import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 
 import { departments } from "../src/data/departments";
@@ -64,11 +64,22 @@ async function main() {
       })),
     });
 
+    await tx.leaveType.createMany({
+      data: leaveTypes.map((leaveType) => ({
+        id: leaveType.id,
+        name: leaveType.name,
+        code: leaveType.code,
+        defaultDays: leaveType.annualAllocation,
+        allowHalfDay: leaveType.allowHalfDay,
+      })),
+    });
+
     console.log(`✓ Employees seeded: ${employees.length}`);
+    console.log(`✓ Leave types seeded: ${leaveTypes.length}`);
   });
 
   console.log("🌱 Database seed completed.");
-} 
+}
 
 main()
   .catch((error) => {
@@ -78,5 +89,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-
-  
