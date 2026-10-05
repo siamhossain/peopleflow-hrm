@@ -29,21 +29,23 @@ enum EmployeeStatus {
   ACTIVE
   INACTIVE
   ON_LEAVE
+  RESIGNED
 }
 
 model Employee {
-  id           String         @id @default(uuid())
-  employeeCode String         @unique
-  firstName    String
-  lastName     String
-  email        String         @unique
-  phone        String?
-  designation  String
-  departmentId String
-  joinDate     DateTime
-  status       EmployeeStatus @default(ACTIVE)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id              String         @id @default(uuid())
+  employeeCode    String         @unique
+  firstName       String
+  lastName        String
+  email           String         @unique
+  phone           String?
+  designation     String
+  departmentId    String
+  joinDate        DateTime
+  resignationDate DateTime?
+  status          EmployeeStatus @default(ACTIVE)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   department        Department         @relation(fields: [departmentId], references: [id])
   user              User?
@@ -84,14 +86,15 @@ enum LeaveStatus {
 }
 
 model LeaveType {
-  id          String   @id @default(uuid())
-  name        String
-  code        String   @unique
-  description String?
-  defaultDays Int
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String
+  code         String   @unique
+  description  String?
+  defaultDays  Int
+  allowHalfDay Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   leaveRequests LeaveRequest[]
   leaveBalances LeaveBalance[]
@@ -140,6 +143,7 @@ enum AttendanceStatus {
   HALF_DAY
   ON_LEAVE
   HOLIDAY
+  WEEKEND
 }
 
 model AttendanceRecord {
@@ -168,6 +172,7 @@ model Holiday {
   name        String
   date        DateTime @unique
   description String?
+  isRecurring Boolean  @default(false)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
