@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -50,7 +45,6 @@ model Employee {
   department        Department         @relation(fields: [departmentId], references: [id])
   user              User?
   leaveRequests     LeaveRequest[]
-  leaveBalances     LeaveBalance[]
   attendanceRecords AttendanceRecord[]
 }
 
@@ -97,7 +91,6 @@ model LeaveType {
   updatedAt    DateTime @updatedAt
 
   leaveRequests LeaveRequest[]
-  leaveBalances LeaveBalance[]
 }
 
 model LeaveRequest {
@@ -116,22 +109,6 @@ model LeaveRequest {
 
   employee  Employee  @relation(fields: [employeeId], references: [id])
   leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
-}
-
-model LeaveBalance {
-  id          String   @id @default(uuid())
-  employeeId  String
-  leaveTypeId String
-  year        Int
-  allocated   Int
-  used        Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  employee  Employee  @relation(fields: [employeeId], references: [id])
-  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
-
-  @@unique([employeeId, leaveTypeId, year])
 }
 
 //attendance domain

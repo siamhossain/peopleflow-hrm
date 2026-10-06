@@ -26,7 +26,6 @@ async function main() {
 
   await prisma.$transaction(async (tx) => {
     await tx.attendanceRecord.deleteMany();
-    await tx.leaveBalance.deleteMany();
     await tx.leaveRequest.deleteMany();
     await tx.user.deleteMany();
     await tx.employee.deleteMany();
