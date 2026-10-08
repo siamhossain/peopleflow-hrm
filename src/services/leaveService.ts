@@ -475,8 +475,14 @@ export const rejectLeaveRequest = async (
   };
 };
 
-export const cancelLeaveRequest = (requestId: string): LeaveActionResult => {
-  const request = leaveRequests.find((item) => item.id === requestId);
+export const cancelLeaveRequest = async (
+  requestId: string,
+): Promise<LeaveActionResult> => {
+  const request = await prisma.leaveRequest.findUnique({
+    where: {
+      id: requestId,
+    },
+  });
 
   if (!request) {
     return {
@@ -485,18 +491,43 @@ export const cancelLeaveRequest = (requestId: string): LeaveActionResult => {
     };
   }
 
-  if (request.status !== "approved") {
+  if (request.status !== "APPROVED") {
     return {
       success: false,
       message: "Only approved leave requests can be cancelled.",
     };
   }
 
-  request.status = "cancelled";
+  const updatedRequest = await prisma.leaveRequest.update({
+    where: {
+      id: requestId,
+    },
+    data: {
+      status: "CANCELLED",
+    },
+  });
+
+  const mappedRequest: LeaveRequest = {
+    id: updatedRequest.id,
+    employeeId: updatedRequest.employeeId,
+    leaveTypeId: updatedRequest.leaveTypeId,
+    startDate: updatedRequest.startDate.toISOString().slice(0, 10),
+    endDate: updatedRequest.endDate.toISOString().slice(0, 10),
+    duration: updatedRequest.duration.toLowerCase() as "full_day" | "half_day",
+    reason: updatedRequest.reason,
+    status: updatedRequest.status.toLowerCase() as
+      | "pending"
+      | "approved"
+      | "rejected"
+      | "cancelled",
+    createdAt: updatedRequest.createdAt.toISOString(),
+    reviewedAt: updatedRequest.approvedAt?.toISOString(),
+    reviewedBy: updatedRequest.approvedBy ?? undefined,
+  };
 
   return {
     success: true,
     message: "Leave request cancelled successfully.",
-    request,
+    request: mappedRequest,
   };
 };
