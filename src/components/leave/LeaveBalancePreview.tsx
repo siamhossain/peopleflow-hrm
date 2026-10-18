@@ -1,6 +1,15 @@
 "use client";
 
-import { calculateLeaveBalance } from "@/services/leaveService";
+import { useEffect, useState } from "react";
+
+interface LeaveBalance {
+  leaveTypeId: string;
+  leaveTypeName: string;
+  allocatedDays: number;
+  usedDays: number;
+  pendingDays: number;
+  remainingDays: number;
+}
 
 interface LeaveBalancePreviewProps {
   employeeId: string;
@@ -11,13 +20,82 @@ export function LeaveBalancePreview({
   employeeId,
   leaveTypeId,
 }: LeaveBalancePreviewProps) {
+  const [balance, setBalance] = useState<LeaveBalance | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function fetchBalance() {
+      setIsLoading(true);
+      setError(null);
+      setBalance(null);
+
+      try {
+        const response = await fetch(
+          `/api/leave/balance?employeeId=${encodeURIComponent(employeeId)}`,
+        );
+
+        const result = (await response.json()) as {
+          data?: LeaveBalance[];
+          message?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(result.message ?? "Failed to load leave balance.");
+        }
+
+        const selectedBalance =
+          result.data?.find((item) => item.leaveTypeId === leaveTypeId) ?? null;
+
+        if (isActive) {
+          setBalance(selectedBalance);
+        }
+      } catch (err) {
+        if (isActive) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Something went wrong while loading the leave balance.",
+          );
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void fetchBalance();
+
+    return () => {
+      isActive = false;
+    };
+  }, [employeeId, leaveTypeId]);
+
   if (!employeeId || !leaveTypeId) {
     return null;
   }
 
-  const balance = calculateLeaveBalance(employeeId).find(
-    (item) => item.leaveTypeId === leaveTypeId,
-  );
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:col-span-2">
+        <p className="text-sm text-gray-600">Loading leave balance...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        role="alert"
+        className="rounded-lg border border-red-200 bg-red-50 p-4 sm:col-span-2"
+      >
+        <p className="text-sm text-red-700">{error}</p>
+      </div>
+    );
+  }
 
   if (!balance) {
     return null;

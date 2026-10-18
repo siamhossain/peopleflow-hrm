@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { LeaveRequest } from "@/types/leave";
 
 import { employees } from "@/data/employees";
 import { getAttendance } from "@/services/attendanceService";
@@ -8,7 +9,6 @@ import {
   getDashboardStats,
   getLatestAttendanceDate,
 } from "@/services/dashboardService";
-import { getLeaveRequests } from "@/services/leaveService";
 
 const DEFAULT_MONTH = "2026-08";
 
@@ -37,10 +37,35 @@ const formatMonth = (month: string) => {
 
 export default function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState(DEFAULT_MONTH);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
 
   const reportDate = getLatestAttendanceDate();
   const stats = getDashboardStats(reportDate);
-  const leaveRequests = getLeaveRequests();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/leave/requests?all=true")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to load leave requests.");
+        }
+
+        return response.json() as Promise<LeaveRequest[]>;
+      })
+      .then((requests) => {
+        if (!cancelled) {
+          setLeaveRequests(requests);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("Failed to load leave requests:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const monthlyAttendance = useMemo(() => {
     const { startDate, endDate } = getMonthDateRange(selectedMonth);

@@ -5,7 +5,6 @@ import { useState } from "react";
 import { LeaveBalancePreview } from "@/components/leave/LeaveBalancePreview";
 import { employees } from "@/data/employees";
 import { leaveTypes } from "@/data/leaveTypes";
-import { createLeaveRequest } from "@/services/leaveService";
 import type { LeaveDuration } from "@/types/leave";
 
 interface LeaveRequestFormProps {
@@ -43,28 +42,46 @@ export function LeaveRequestForm({
     setError("");
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setIsSubmitting(true);
 
-    const result = createLeaveRequest({
-      employeeId: selectedEmployeeId,
-      leaveTypeId,
-      startDate,
-      endDate,
-      duration,
-      reason,
-    });
+    try {
+      const response = await fetch("/api/leave/requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          employeeId: selectedEmployeeId,
+          leaveTypeId,
+          startDate,
+          endDate,
+          duration,
+          reason,
+        }),
+      });
 
-    if (!result.success) {
-      setError(result.message);
+      const result = (await response.json()) as {
+        data?: unknown;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.message ?? "Failed to submit leave request.");
+      }
+
+      onSuccess();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while submitting the request.",
+      );
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    setIsSubmitting(false);
-    onSuccess();
   };
 
   return (
@@ -220,7 +237,10 @@ export function LeaveRequestForm({
           </div>
 
           {error && (
-            <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:col-span-2"
+            >
               {error}
             </div>
           )}

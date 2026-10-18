@@ -2,78 +2,117 @@
 
 import { useState } from "react";
 
-import {
-  approveLeaveRequest,
-  cancelLeaveRequest,
-  getLeaveRequests,
-  rejectLeaveRequest,
-} from "@/services/leaveService";
-import type { LeaveRequest } from "@/types/leave";
 import { LeaveFilters } from "@/components/leave/LeaveFilters";
 import { LeaveRequestDetails } from "@/components/leave/LeaveRequestDetails";
 import { LeaveRequestForm } from "@/components/leave/LeaveRequestForm";
+import type { LeaveRequest } from "@/types/leave";
 
 interface LeaveManagementProps {
   requests: LeaveRequest[];
 }
 
+type LeaveAction = "approve" | "reject" | "cancel";
+
 export function LeaveManagement({
   requests: initialRequests,
 }: LeaveManagementProps) {
   const [requests, setRequests] = useState(initialRequests);
-
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(
     null,
   );
-
   const [showCreateForm, setShowCreateForm] = useState(false);
-
   const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const refreshRequests = async () => {
+    const response = await fetch("/api/leave/requests?all=true");
+    const result = (await response.json()) as {
+      data?: LeaveRequest[];
+      message?: string;
+    };
+
+    if (!response.ok) {
+      throw new Error(result.message ?? "Failed to refresh leave requests.");
+    }
+
+    const updatedRequests = result.data ?? [];
+    setRequests(updatedRequests);
+
+    return updatedRequests;
+  };
 
   const handleView = (request: LeaveRequest) => {
     setSelectedRequest(request);
   };
 
-  const handleApprove = (request: LeaveRequest) => {
-    const result = approveLeaveRequest(request.id, "emp-006");
+  const handleAction = async (request: LeaveRequest, action: LeaveAction) => {
+    setIsUpdating(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
-    if (!result.success || !result.request) {
-      return;
+    try {
+      const response = await fetch("/api/leave/requests", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          requestId: request.id,
+          action,
+          reviewerId: "emp-006",
+        }),
+      });
+
+      const result = (await response.json()) as {
+        data?: LeaveRequest;
+        message?: string;
+      };
+
+      if (!response.ok || !result.data) {
+        throw new Error(result.message ?? "Failed to update leave request.");
+      }
+
+      const updatedRequests = await refreshRequests();
+      const refreshedRequest =
+        updatedRequests.find((item) => item.id === result.data?.id) ??
+        result.data;
+
+      setSelectedRequest(refreshedRequest);
+
+      const messages: Record<LeaveAction, string> = {
+        approve: "Leave request approved successfully.",
+        reject: "Leave request rejected successfully.",
+        cancel: "Leave request cancelled successfully.",
+      };
+
+      setSuccessMessage(messages[action]);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while updating the request.",
+      );
+    } finally {
+      setIsUpdating(false);
     }
-
-    setRequests(getLeaveRequests());
-    setSelectedRequest(result.request);
-    setSuccessMessage("Leave request approved successfully.");
   };
 
-  const handleReject = (request: LeaveRequest) => {
-    const result = rejectLeaveRequest(request.id, "emp-006");
+  const handleCreateSuccess = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
 
-    if (!result.success || !result.request) {
-      return;
+    try {
+      await refreshRequests();
+      setShowCreateForm(false);
+      setSuccessMessage("Leave request created successfully.");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Request created, but refreshing the list failed.",
+      );
     }
-
-    setRequests(getLeaveRequests());
-    setSelectedRequest(result.request);
-    setSuccessMessage("Leave request rejected successfully.");
-  };
-
-  const handleCancel = (request: LeaveRequest) => {
-    const result = cancelLeaveRequest(request.id);
-
-    if (!result.success || !result.request) {
-      return;
-    }
-
-    setRequests(getLeaveRequests());
-    setSelectedRequest(result.request);
-    setSuccessMessage("Leave request cancelled successfully.");
-  };
-
-  const handleCreateSuccess = () => {
-    setRequests(getLeaveRequests());
-    setShowCreateForm(false);
-    setSuccessMessage("Leave request created successfully.");
   };
 
   return (
@@ -92,11 +131,21 @@ export function LeaveManagement({
         </div>
       )}
 
+      {errorMessage && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {errorMessage}
+        </div>
+      )}
+
       <div className="flex justify-end">
         <button
           type="button"
           onClick={() => {
             setSuccessMessage("");
+            setErrorMessage("");
             setShowCreateForm(true);
           }}
           className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
@@ -107,7 +156,9 @@ export function LeaveManagement({
 
       {showCreateForm && (
         <LeaveRequestForm
-          onSuccess={handleCreateSuccess}
+          onSuccess={() => {
+            void handleCreateSuccess();
+          }}
           onCancel={() => setShowCreateForm(false)}
         />
       )}
@@ -115,9 +166,9 @@ export function LeaveManagement({
       <LeaveFilters
         requests={requests}
         onView={handleView}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onCancel={handleCancel}
+        onApprove={(request) => void handleAction(request, "approve")}
+        onReject={(request) => void handleAction(request, "reject")}
+        onCancel={(request) => void handleAction(request, "cancel")}
       />
 
       {selectedRequest && (
@@ -125,6 +176,12 @@ export function LeaveManagement({
           request={selectedRequest}
           onClose={() => setSelectedRequest(null)}
         />
+      )}
+
+      {isUpdating && (
+        <p role="status" className="text-sm text-gray-500">
+          Updating leave request...
+        </p>
       )}
     </div>
   );

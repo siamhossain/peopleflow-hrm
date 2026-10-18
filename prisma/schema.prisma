@@ -97,8 +97,8 @@ model LeaveRequest {
   id          String        @id @default(uuid())
   employeeId  String
   leaveTypeId String
-  startDate   DateTime
-  endDate     DateTime
+  startDate   DateTime      @db.Date
+  endDate     DateTime      @db.Date
   duration    LeaveDuration
   reason      String
   status      LeaveStatus   @default(PENDING)

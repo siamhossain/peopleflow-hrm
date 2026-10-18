@@ -1,5 +1,33 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { leaveRequests } from "@/data/leaveRequests";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  employeeFindUnique: vi.fn(),
+  leaveTypeFindUnique: vi.fn(),
+  leaveTypeFindMany: vi.fn(),
+  leaveRequestFindMany: vi.fn(),
+  leaveRequestCreate: vi.fn(),
+  leaveRequestFindUnique: vi.fn(),
+  leaveRequestUpdate: vi.fn(),
+}));
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    employee: {
+      findUnique: mocks.employeeFindUnique,
+    },
+    leaveType: {
+      findUnique: mocks.leaveTypeFindUnique,
+      findMany: mocks.leaveTypeFindMany,
+    },
+    leaveRequest: {
+      findMany: mocks.leaveRequestFindMany,
+      create: mocks.leaveRequestCreate,
+      findUnique: mocks.leaveRequestFindUnique,
+      update: mocks.leaveRequestUpdate,
+    },
+  },
+}));
+
 import {
   approveLeaveRequest,
   calculateLeaveBalance,
@@ -9,248 +37,371 @@ import {
   validateLeaveRequest,
 } from "@/services/leaveService";
 
-const originalLeaveRequests = leaveRequests.map((request) => ({
-  ...request,
-}));
+const employee = {
+  id: "emp-001",
+  joinDate: new Date("2020-01-01T00:00:00.000Z"),
+  resignationDate: null,
+};
 
-afterEach(() => {
-  leaveRequests.splice(
-    0,
-    leaveRequests.length,
-    ...originalLeaveRequests.map((request) => ({
-      ...request,
-    })),
-  );
+const annualLeave = {
+  id: "leave-annual",
+  name: "Annual Leave",
+  defaultDays: 20,
+  isActive: true,
+};
+
+const sickLeave = {
+  id: "leave-sick",
+  name: "Sick Leave",
+  defaultDays: 10,
+  isActive: true,
+};
+
+const request = (overrides: Record<string, unknown> = {}) => ({
+  id: "request-001",
+  employeeId: "emp-001",
+  leaveTypeId: "leave-annual",
+  startDate: new Date("2026-08-10T00:00:00.000Z"),
+  endDate: new Date("2026-08-11T00:00:00.000Z"),
+  duration: "FULL_DAY",
+  reason: "Personal travel",
+  status: "APPROVED",
+  createdAt: new Date("2026-08-01T00:00:00.000Z"),
+  approvedAt: new Date("2026-08-02T00:00:00.000Z"),
+  approvedBy: "reviewer-001",
+  ...overrides,
 });
 
-describe("Leave Service - Business Rules", () => {
-  it("calculates leave balance for an employee", () => {
-    const balance = calculateLeaveBalance("emp-001");
+const validInput = {
+  employeeId: "emp-001",
+  leaveTypeId: "leave-annual",
+  startDate: "2026-08-25",
+  endDate: "2026-08-26",
+  duration: "full_day" as const,
+  reason: "Personal travel",
+};
 
-    const annualLeave = balance.find(
-      (item) => item.leaveTypeId === "leave-annual",
-    );
+beforeEach(() => {
+  vi.resetAllMocks();
 
-    expect(annualLeave).toBeDefined();
-    expect(annualLeave?.allocatedDays).toBe(20);
-    expect(annualLeave?.usedDays).toBe(2);
-    expect(annualLeave?.remainingDays).toBe(18);
+  mocks.employeeFindUnique.mockResolvedValue(employee);
+  mocks.leaveTypeFindUnique.mockImplementation(async ({ where }) => {
+    if (where.id === annualLeave.id) return annualLeave;
+    if (where.id === sickLeave.id) return sickLeave;
+    return null;
   });
 
-  it("calculates two approved half-days as one full leave day", () => {
-    const balance = calculateLeaveBalance("emp-011");
+  mocks.leaveTypeFindMany.mockResolvedValue([annualLeave, sickLeave]);
+  mocks.leaveRequestFindMany.mockResolvedValue([]);
+});
 
-    const sickLeave = balance.find(
-      (item) => item.leaveTypeId === "leave-sick",
-    );
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
-    expect(sickLeave).toBeDefined();
-    expect(sickLeave?.usedDays).toBe(1);
-  });
+describe("Leave Service — Business Rules", () => {
+  describe("calculateLeaveBalance", () => {
+    it("calculates used and remaining annual leave", async () => {
+      mocks.leaveRequestFindMany.mockResolvedValue([
+        request({
+          startDate: new Date("2026-08-10T00:00:00.000Z"),
+          endDate: new Date("2026-08-11T00:00:00.000Z"),
+        }),
+      ]);
 
-  it("rejects a leave request when start date is after end date", () => {
-    const error = validateLeaveRequest({
-      employeeId: "emp-001",
-      leaveTypeId: "leave-annual",
-      startDate: "2026-08-25",
-      endDate: "2026-08-20",
-      duration: "full_day",
-      reason: "Annual leave",
+      const balance = await calculateLeaveBalance("emp-001");
+      const annual = balance.find(
+        (item) => item.leaveTypeId === "leave-annual",
+      );
+
+      expect(annual).toMatchObject({
+        allocatedDays: 20,
+        usedDays: 2,
+        pendingDays: 0,
+        remainingDays: 18,
+      });
     });
 
-    expect(error).toBe(
-      "Start date cannot be after end date.",
-    );
-  });
+    it("counts two approved half-days as one full day", async () => {
+      mocks.leaveRequestFindMany.mockResolvedValue([
+        request({
+          leaveTypeId: "leave-sick",
+          duration: "HALF_DAY",
+          startDate: new Date("2026-08-10T00:00:00.000Z"),
+          endDate: new Date("2026-08-10T00:00:00.000Z"),
+        }),
+        request({
+          id: "request-002",
+          leaveTypeId: "leave-sick",
+          duration: "HALF_DAY",
+          startDate: new Date("2026-08-11T00:00:00.000Z"),
+          endDate: new Date("2026-08-11T00:00:00.000Z"),
+        }),
+      ]);
 
-  it("requires a leave reason", () => {
-    const error = validateLeaveRequest({
-      employeeId: "emp-001",
-      leaveTypeId: "leave-annual",
-      startDate: "2026-08-26",
-      endDate: "2026-08-27",
-      duration: "full_day",
-      reason: "   ",
+      const balance = await calculateLeaveBalance("emp-001");
+      const sick = balance.find((item) => item.leaveTypeId === "leave-sick");
+
+      expect(sick?.usedDays).toBe(1);
     });
 
-    expect(error).toBe("Leave reason is required.");
+    it("counts pending leave separately from used leave", async () => {
+      mocks.leaveRequestFindMany.mockResolvedValue([
+        request({
+          status: "PENDING",
+          startDate: new Date("2026-08-10T00:00:00.000Z"),
+          endDate: new Date("2026-08-11T00:00:00.000Z"),
+        }),
+      ]);
+
+      const balance = await calculateLeaveBalance("emp-001");
+      const annual = balance.find(
+        (item) => item.leaveTypeId === "leave-annual",
+      );
+
+      expect(annual?.usedDays).toBe(0);
+      expect(annual?.pendingDays).toBe(2);
+    });
   });
 
-  it("rejects half-day leave spanning multiple dates", () => {
-    const error = validateLeaveRequest({
-      employeeId: "emp-001",
-      leaveTypeId: "leave-annual",
-      startDate: "2026-08-26",
-      endDate: "2026-08-27",
-      duration: "half_day",
-      reason: "Personal work",
+  describe("validateLeaveRequest", () => {
+    it("rejects a start date after the end date", async () => {
+      const error = await validateLeaveRequest({
+        ...validInput,
+        startDate: "2026-08-27",
+        endDate: "2026-08-26",
+      });
+
+      expect(error).toBe("Start date cannot be after end date.");
     });
 
-    expect(error).toBe(
-      "Half-day leave must use the same start and end date.",
-    );
-  });
+    it("requires a leave reason", async () => {
+      const error = await validateLeaveRequest({
+        ...validInput,
+        reason: "   ",
+      });
 
-  it("rejects overlapping leave against an approved request", () => {
-    const error = validateLeaveRequest({
-      employeeId: "emp-001",
-      leaveTypeId: "leave-annual",
-      startDate: "2026-08-25",
-      endDate: "2026-08-26",
-      duration: "full_day",
-      reason: "Another trip",
+      expect(error).toBe("Leave reason is required.");
     });
 
-    expect(error).toBe(
-      "Leave request overlaps with an existing leave request.",
-    );
-  });
+    it("rejects half-day leave spanning multiple dates", async () => {
+      const error = await validateLeaveRequest({
+        ...validInput,
+        duration: "half_day",
+      });
 
-  it("allows a new leave request when the previous request was rejected", () => {
-    const error = validateLeaveRequest({
-      employeeId: "emp-008",
-      leaveTypeId: "leave-sick",
-      startDate: "2026-08-12",
-      endDate: "2026-08-12",
-      duration: "full_day",
-      reason: "New medical request",
+      expect(error).toBe(
+        "Half-day leave must use the same start and end date.",
+      );
     });
 
-    expect(error).toBeNull();
-  });
+    it("rejects an unknown employee", async () => {
+      mocks.employeeFindUnique.mockResolvedValue(null);
 
-  it("creates a valid leave request with pending status", () => {
-    const result = createLeaveRequest({
-      employeeId: "emp-006",
-      leaveTypeId: "leave-annual",
-      startDate: "2026-10-05",
-      endDate: "2026-10-06",
-      duration: "full_day",
-      reason: "Personal travel",
+      const error = await validateLeaveRequest(validInput);
+
+      expect(error).toBe("Employee not found.");
     });
 
-    expect(result.success).toBe(true);
-    expect(result.request?.status).toBe("pending");
-    expect(result.request?.employeeId).toBe("emp-006");
+    it("rejects an unknown leave type", async () => {
+      mocks.leaveTypeFindUnique.mockResolvedValue(null);
+
+      const error = await validateLeaveRequest(validInput);
+
+      expect(error).toBe("Leave type not found.");
+    });
+
+    it("rejects leave before the employee joining date", async () => {
+      mocks.employeeFindUnique.mockResolvedValue({
+        ...employee,
+        joinDate: new Date("2026-09-01T00:00:00.000Z"),
+      });
+
+      const error = await validateLeaveRequest(validInput);
+
+      expect(error).toBe(
+        "Leave cannot start before the employee joining date.",
+      );
+    });
+
+    it("rejects overlapping active requests", async () => {
+      mocks.leaveRequestFindMany.mockResolvedValue([
+        request({
+          startDate: new Date("2026-08-25T00:00:00.000Z"),
+          endDate: new Date("2026-08-26T00:00:00.000Z"),
+        }),
+      ]);
+
+      const error = await validateLeaveRequest(validInput);
+
+      expect(error).toBe(
+        "Leave request overlaps with an existing leave request.",
+      );
+    });
+
+    it("allows overlapping dates when the previous request was rejected", async () => {
+      mocks.leaveRequestFindMany.mockResolvedValue([
+        request({
+          status: "REJECTED",
+          startDate: new Date("2026-08-25T00:00:00.000Z"),
+          endDate: new Date("2026-08-26T00:00:00.000Z"),
+        }),
+      ]);
+
+      const error = await validateLeaveRequest(validInput);
+
+      expect(error).toBeNull();
+    });
+
+    it("rejects requests exceeding the available balance", async () => {
+      mocks.leaveRequestFindMany.mockResolvedValue([
+        request({
+          status: "APPROVED",
+          startDate: new Date("2026-01-01T00:00:00.000Z"),
+          endDate: new Date("2026-01-15T00:00:00.000Z"),
+        }),
+      ]);
+
+      const error = await validateLeaveRequest({
+        ...validInput,
+        startDate: "2026-08-25",
+        endDate: "2026-08-30",
+      });
+
+      expect(error).toBe(
+        "Requested leave exceeds the available leave balance.",
+      );
+    });
   });
 
-  it("approves a pending leave request", () => {
-    const result = approveLeaveRequest(
-      "leave-req-006",
-      "emp-006",
-    );
+  describe("createLeaveRequest", () => {
+    it("creates a valid request with pending status", async () => {
+      mocks.leaveRequestCreate.mockResolvedValue(
+        request({
+          id: "request-new",
+          status: "PENDING",
+          startDate: new Date("2026-08-25T00:00:00.000Z"),
+          endDate: new Date("2026-08-26T00:00:00.000Z"),
+          approvedAt: null,
+          approvedBy: null,
+        }),
+      );
 
-    expect(result.success).toBe(true);
-    expect(result.request?.status).toBe("approved");
-    expect(result.request?.reviewedBy).toBe("emp-006");
+      const result = await createLeaveRequest(validInput);
+
+      expect(result.success).toBe(true);
+      expect(result.request?.status).toBe("pending");
+      expect(result.request?.employeeId).toBe("emp-001");
+      expect(mocks.leaveRequestCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "PENDING",
+            reason: "Personal travel",
+          }),
+        }),
+      );
+    });
+
+    it("does not create a request when validation fails", async () => {
+      const result = await createLeaveRequest({
+        ...validInput,
+        reason: " ",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe("Leave reason is required.");
+      expect(mocks.leaveRequestCreate).not.toHaveBeenCalled();
+    });
   });
 
-  it("rejects a pending leave request", () => {
-    const result = rejectLeaveRequest(
-      "leave-req-005",
-      "emp-006",
-    );
+  describe("approveLeaveRequest", () => {
+    it("approves a pending request", async () => {
+      mocks.leaveRequestFindUnique.mockResolvedValue(
+        request({ status: "PENDING", approvedAt: null, approvedBy: null }),
+      );
+      mocks.leaveRequestUpdate.mockResolvedValue(
+        request({ status: "APPROVED", approvedBy: "reviewer-001" }),
+      );
 
-    expect(result.success).toBe(true);
-    expect(result.request?.status).toBe("rejected");
-    expect(result.request?.reviewedBy).toBe("emp-006");
+      const result = await approveLeaveRequest("request-001", "reviewer-001");
+
+      expect(result.success).toBe(true);
+      expect(result.request?.status).toBe("approved");
+      expect(result.request?.reviewedBy).toBe("reviewer-001");
+    });
+
+    it("prevents approving a rejected request", async () => {
+      mocks.leaveRequestFindUnique.mockResolvedValue(
+        request({ status: "REJECTED" }),
+      );
+
+      const result = await approveLeaveRequest("request-001", "reviewer-001");
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(
+        "Only pending leave requests can be approved.",
+      );
+      expect(mocks.leaveRequestUpdate).not.toHaveBeenCalled();
+    });
   });
 
-  it("cancels an approved leave request", () => {
-    const result = cancelLeaveRequest(
-      "leave-req-001",
-    );
+  describe("rejectLeaveRequest", () => {
+    it("rejects a pending request", async () => {
+      mocks.leaveRequestFindUnique.mockResolvedValue(
+        request({ status: "PENDING", approvedAt: null, approvedBy: null }),
+      );
+      mocks.leaveRequestUpdate.mockResolvedValue(
+        request({ status: "REJECTED", approvedBy: "reviewer-001" }),
+      );
 
-    expect(result.success).toBe(true);
-    expect(result.request?.status).toBe("cancelled");
+      const result = await rejectLeaveRequest("request-001", "reviewer-001");
+
+      expect(result.success).toBe(true);
+      expect(result.request?.status).toBe("rejected");
+    });
+
+    it("prevents rejecting an approved request", async () => {
+      mocks.leaveRequestFindUnique.mockResolvedValue(
+        request({ status: "APPROVED" }),
+      );
+
+      const result = await rejectLeaveRequest("request-001", "reviewer-001");
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(
+        "Only pending leave requests can be rejected.",
+      );
+      expect(mocks.leaveRequestUpdate).not.toHaveBeenCalled();
+    });
   });
 
-  it("prevents approving a rejected request", () => {
-    const result = approveLeaveRequest(
-      "leave-req-007",
-      "emp-006",
-    );
+  describe("cancelLeaveRequest", () => {
+    it("cancels an approved request", async () => {
+      mocks.leaveRequestFindUnique.mockResolvedValue(
+        request({ status: "APPROVED" }),
+      );
+      mocks.leaveRequestUpdate.mockResolvedValue(
+        request({ status: "CANCELLED" }),
+      );
 
-    expect(result.success).toBe(false);
-    expect(result.message).toBe(
-      "Only pending leave requests can be approved.",
-    );
-  });
+      const result = await cancelLeaveRequest("request-001");
 
-  it("prevents approving a cancelled request", () => {
-    const result = approveLeaveRequest(
-      "leave-req-013",
-      "emp-006",
-    );
+      expect(result.success).toBe(true);
+      expect(result.request?.status).toBe("cancelled");
+    });
 
-    expect(result.success).toBe(false);
-    expect(result.message).toBe(
-      "Only pending leave requests can be approved.",
-    );
-  });
+    it("prevents cancelling a pending request", async () => {
+      mocks.leaveRequestFindUnique.mockResolvedValue(
+        request({ status: "PENDING" }),
+      );
 
-  it("prevents rejecting an already approved request", () => {
-    const result = rejectLeaveRequest(
-      "leave-req-001",
-      "emp-006",
-    );
+      const result = await cancelLeaveRequest("request-001");
 
-    expect(result.success).toBe(false);
-    expect(result.message).toBe(
-      "Only pending leave requests can be rejected.",
-    );
-  });
-
-  it("prevents cancelling a pending request", () => {
-    const result = cancelLeaveRequest(
-      "leave-req-006",
-    );
-
-    expect(result.success).toBe(false);
-    expect(result.message).toBe(
-      "Only approved leave requests can be cancelled.",
-    );
-  });
-
-  it("updates used balance after approval and restores it after cancellation", () => {
-    const before = calculateLeaveBalance("emp-007");
-
-    const beforeAnnual = before.find(
-      (item) => item.leaveTypeId === "leave-annual",
-    );
-
-    expect(beforeAnnual?.usedDays).toBe(0);
-
-    const approval = approveLeaveRequest(
-      "leave-req-006",
-      "emp-006",
-    );
-
-    expect(approval.success).toBe(true);
-
-    const afterApproval = calculateLeaveBalance("emp-007");
-
-    const approvedAnnual = afterApproval.find(
-      (item) => item.leaveTypeId === "leave-annual",
-    );
-
-    expect(approvedAnnual?.usedDays).toBe(3);
-    expect(approvedAnnual?.remainingDays).toBe(17);
-
-    const cancellation = cancelLeaveRequest(
-      "leave-req-006",
-    );
-
-    expect(cancellation.success).toBe(true);
-
-    const afterCancellation =
-      calculateLeaveBalance("emp-007");
-
-    const cancelledAnnual = afterCancellation.find(
-      (item) => item.leaveTypeId === "leave-annual",
-    );
-
-    expect(cancelledAnnual?.usedDays).toBe(0);
-    expect(cancelledAnnual?.remainingDays).toBe(20);
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(
+        "Only approved leave requests can be cancelled.",
+      );
+      expect(mocks.leaveRequestUpdate).not.toHaveBeenCalled();
+    });
   });
 });

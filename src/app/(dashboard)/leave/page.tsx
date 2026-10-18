@@ -1,8 +1,8 @@
 import { LeaveManagement } from "@/components/leave/LeaveManagement";
 import { getLeaveRequests } from "@/services/leaveService";
 
-export default function LeavePage() {
-  const requests = getLeaveRequests();
+export default async function LeavePage() {
+  const requests = await getLeaveRequests();
 
   return (
     <section>

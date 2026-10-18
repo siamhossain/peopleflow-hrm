@@ -1,6 +1,3 @@
-// import { leaveRequests } from "@/data/leaveRequests";
-// import { leaveTypes } from "@/data/leaveTypes";
-// import { employees } from "@/data/employees";
 import { prisma } from "@/lib/prisma";
 import type { LeaveRequest } from "@/types/leave";
 
@@ -28,6 +25,18 @@ export interface LeaveActionResult {
   request?: LeaveRequest;
 }
 
+const formatDateOnly = (date: Date): string => {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+
+  return [year, month, day].join("-");
+};
+
+const parseDateOnly = (date: string): Date => {
+  return new Date(`${date}T00:00:00.000Z`);
+};
+
 const isDateRangeOverlapping = (
   startDate: string,
   endDate: string,
@@ -40,24 +49,16 @@ const isDateRangeOverlapping = (
 const calculateRequestDays = (
   request: Pick<LeaveRequest, "startDate" | "endDate" | "duration">,
 ): number => {
-  const start = new Date(`${request.startDate}T00:00:00`);
-  const end = new Date(`${request.endDate}T00:00:00`);
+  const start = parseDateOnly(request.startDate);
+  const end = parseDateOnly(request.endDate);
 
-  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
 
   const calendarDays =
     Math.floor((end.getTime() - start.getTime()) / millisecondsPerDay) + 1;
 
-  if (request.duration === "half_day") {
-    return calendarDays * 0.5;
-  }
-
-  return calendarDays;
+  return request.duration === "half_day" ? calendarDays * 0.5 : calendarDays;
 };
-
-// const getEmployeeById = (employeeId: string) => {
-//   return employees.find((employee) => employee.id === employeeId);
-// };
 
 const getEmployeeById = async (employeeId: string) => {
   return prisma.employee.findUnique({
@@ -67,10 +68,6 @@ const getEmployeeById = async (employeeId: string) => {
   });
 };
 
-// const getLeaveTypeById = (leaveTypeId: string) => {
-//   return leaveTypes.find((leaveType) => leaveType.id === leaveTypeId);
-// };
-
 const getLeaveTypeById = async (leaveTypeId: string) => {
   return prisma.leaveType.findUnique({
     where: {
@@ -78,10 +75,6 @@ const getLeaveTypeById = async (leaveTypeId: string) => {
     },
   });
 };
-
-// export const getLeaveRequests = (): LeaveRequest[] => {
-//   return [...leaveRequests];
-// };
 
 export const getLeaveRequests = async (): Promise<LeaveRequest[]> => {
   const requests = await prisma.leaveRequest.findMany({
@@ -94,8 +87,8 @@ export const getLeaveRequests = async (): Promise<LeaveRequest[]> => {
     id: request.id,
     employeeId: request.employeeId,
     leaveTypeId: request.leaveTypeId,
-    startDate: request.startDate.toISOString().slice(0, 10),
-    endDate: request.endDate.toISOString().slice(0, 10),
+    startDate: formatDateOnly(request.startDate),
+    endDate: formatDateOnly(request.endDate),
     duration: request.duration.toLowerCase() as "full_day" | "half_day",
     reason: request.reason,
     status: request.status.toLowerCase() as
@@ -108,12 +101,6 @@ export const getLeaveRequests = async (): Promise<LeaveRequest[]> => {
     reviewedBy: request.approvedBy ?? undefined,
   }));
 };
-
-// export const getEmployeeLeaveRequests = (
-//   employeeId: string,
-// ): LeaveRequest[] => {
-//   return leaveRequests.filter((request) => request.employeeId === employeeId);
-// };
 
 export const getEmployeeLeaveRequests = async (
   employeeId: string,
@@ -131,8 +118,8 @@ export const getEmployeeLeaveRequests = async (
     id: request.id,
     employeeId: request.employeeId,
     leaveTypeId: request.leaveTypeId,
-    startDate: request.startDate.toISOString().slice(0, 10),
-    endDate: request.endDate.toISOString().slice(0, 10),
+    startDate: formatDateOnly(request.startDate),
+    endDate: formatDateOnly(request.endDate),
     duration: request.duration.toLowerCase() as "full_day" | "half_day",
     reason: request.reason,
     status: request.status.toLowerCase() as
@@ -145,35 +132,6 @@ export const getEmployeeLeaveRequests = async (
     reviewedBy: request.approvedBy ?? undefined,
   }));
 };
-
-// export const calculateLeaveBalance = (employeeId: string): LeaveBalance[] => {
-//   const employeeRequests = getEmployeeLeaveRequests(employeeId);
-
-//   return leaveTypes.map((leaveType) => {
-//     const usedDays = employeeRequests
-//       .filter(
-//         (request) =>
-//           request.leaveTypeId === leaveType.id && request.status === "approved",
-//       )
-//       .reduce((total, request) => total + calculateRequestDays(request), 0);
-
-//     const pendingDays = employeeRequests
-//       .filter(
-//         (request) =>
-//           request.leaveTypeId === leaveType.id && request.status === "pending",
-//       )
-//       .reduce((total, request) => total + calculateRequestDays(request), 0);
-
-//     return {
-//       leaveTypeId: leaveType.id,
-//       leaveTypeName: leaveType.name,
-//       allocatedDays: leaveType.annualAllocation,
-//       usedDays,
-//       pendingDays,
-//       remainingDays: Math.max(0, leaveType.annualAllocation - usedDays),
-//     };
-//   });
-// };
 
 export const calculateLeaveBalance = async (
   employeeId: string,
@@ -202,8 +160,8 @@ export const calculateLeaveBalance = async (
         (total, request) =>
           total +
           calculateRequestDays({
-            startDate: request.startDate.toISOString().slice(0, 10),
-            endDate: request.endDate.toISOString().slice(0, 10),
+            startDate: formatDateOnly(request.startDate),
+            endDate: formatDateOnly(request.endDate),
             duration: request.duration.toLowerCase() as "full_day" | "half_day",
           }),
         0,
@@ -215,8 +173,8 @@ export const calculateLeaveBalance = async (
         (total, request) =>
           total +
           calculateRequestDays({
-            startDate: request.startDate.toISOString().slice(0, 10),
-            endDate: request.endDate.toISOString().slice(0, 10),
+            startDate: formatDateOnly(request.startDate),
+            endDate: formatDateOnly(request.endDate),
             duration: request.duration.toLowerCase() as "full_day" | "half_day",
           }),
         0,
@@ -260,11 +218,17 @@ export const validateLeaveRequest = async (
     return "Half-day leave must use the same start and end date.";
   }
 
-  if (input.startDate < employee.joiningDate) {
+  const employeeJoinDate = formatDateOnly(employee.joinDate);
+
+  const employeeResignationDate = employee.resignationDate
+    ? formatDateOnly(employee.resignationDate)
+    : undefined;
+
+  if (input.startDate < employeeJoinDate) {
     return "Leave cannot start before the employee joining date.";
   }
 
-  if (employee.resignationDate && input.endDate > employee.resignationDate) {
+  if (employeeResignationDate && input.endDate > employeeResignationDate) {
     return "Leave cannot extend beyond the employee resignation date.";
   }
 
@@ -322,8 +286,8 @@ export const createLeaveRequest = async (
     data: {
       employeeId: input.employeeId,
       leaveTypeId: input.leaveTypeId,
-      startDate: new Date(`${input.startDate}T00:00:00`),
-      endDate: new Date(`${input.endDate}T00:00:00`),
+      startDate: parseDateOnly(input.startDate),
+      endDate: parseDateOnly(input.endDate),
       duration: input.duration.toUpperCase() as "FULL_DAY" | "HALF_DAY",
       reason: input.reason.trim(),
       status: "PENDING",
@@ -334,8 +298,8 @@ export const createLeaveRequest = async (
     id: createdRequest.id,
     employeeId: createdRequest.employeeId,
     leaveTypeId: createdRequest.leaveTypeId,
-    startDate: createdRequest.startDate.toISOString().slice(0, 10),
-    endDate: createdRequest.endDate.toISOString().slice(0, 10),
+    startDate: formatDateOnly(createdRequest.startDate),
+    endDate: formatDateOnly(createdRequest.endDate),
     duration: createdRequest.duration.toLowerCase() as "full_day" | "half_day",
     reason: createdRequest.reason,
     status: createdRequest.status.toLowerCase() as
@@ -394,8 +358,8 @@ export const approveLeaveRequest = async (
     id: updatedRequest.id,
     employeeId: updatedRequest.employeeId,
     leaveTypeId: updatedRequest.leaveTypeId,
-    startDate: updatedRequest.startDate.toISOString().slice(0, 10),
-    endDate: updatedRequest.endDate.toISOString().slice(0, 10),
+    startDate: formatDateOnly(updatedRequest.startDate),
+    endDate: formatDateOnly(updatedRequest.endDate),
     duration: updatedRequest.duration.toLowerCase() as "full_day" | "half_day",
     reason: updatedRequest.reason,
     status: updatedRequest.status.toLowerCase() as
@@ -454,8 +418,8 @@ export const rejectLeaveRequest = async (
     id: updatedRequest.id,
     employeeId: updatedRequest.employeeId,
     leaveTypeId: updatedRequest.leaveTypeId,
-    startDate: updatedRequest.startDate.toISOString().slice(0, 10),
-    endDate: updatedRequest.endDate.toISOString().slice(0, 10),
+    startDate: formatDateOnly(updatedRequest.startDate),
+    endDate: formatDateOnly(updatedRequest.endDate),
     duration: updatedRequest.duration.toLowerCase() as "full_day" | "half_day",
     reason: updatedRequest.reason,
     status: updatedRequest.status.toLowerCase() as
@@ -511,8 +475,8 @@ export const cancelLeaveRequest = async (
     id: updatedRequest.id,
     employeeId: updatedRequest.employeeId,
     leaveTypeId: updatedRequest.leaveTypeId,
-    startDate: updatedRequest.startDate.toISOString().slice(0, 10),
-    endDate: updatedRequest.endDate.toISOString().slice(0, 10),
+    startDate: formatDateOnly(updatedRequest.startDate),
+    endDate: formatDateOnly(updatedRequest.endDate),
     duration: updatedRequest.duration.toLowerCase() as "full_day" | "half_day",
     reason: updatedRequest.reason,
     status: updatedRequest.status.toLowerCase() as
