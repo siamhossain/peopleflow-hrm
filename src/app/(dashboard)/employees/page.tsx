@@ -1,8 +1,8 @@
 import { EmployeeFilters } from "@/components/employees/EmployeeFilters";
 import { getEmployees } from "@/services/employeeService";
 
-export default function EmployeesPage() {
-  const employees = getEmployees();
+export default async function EmployeesPage() {
+  const employees = await getEmployees();
 
   return (
     <section>

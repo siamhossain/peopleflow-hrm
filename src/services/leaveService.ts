@@ -186,7 +186,10 @@ export const calculateLeaveBalance = async (
       allocatedDays: leaveType.defaultDays,
       usedDays,
       pendingDays,
-      remainingDays: Math.max(0, leaveType.defaultDays - usedDays),
+      remainingDays: Math.max(
+        0,
+        leaveType.defaultDays - usedDays - pendingDays,
+      ),
     };
   });
 };
@@ -206,16 +209,24 @@ export const validateLeaveRequest = async (
     return "Leave type not found.";
   }
 
+  if (!leaveType.isActive) {
+    return "This leave type is inactive.";
+  }
+
   if (input.startDate > input.endDate) {
     return "Start date cannot be after end date.";
   }
 
-  if (!input.reason.trim()) {
-    return "Leave reason is required.";
-  }
-
   if (input.duration === "half_day" && input.startDate !== input.endDate) {
     return "Half-day leave must use the same start and end date.";
+  }
+
+  if (input.duration === "half_day" && !leaveType.allowHalfDay) {
+    return "Half-day leave is not allowed for this leave type.";
+  }
+
+  if (!input.reason.trim()) {
+    return "Leave reason is required.";
   }
 
   const employeeJoinDate = formatDateOnly(employee.joinDate);

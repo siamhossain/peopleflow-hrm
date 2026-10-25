@@ -1,4 +1,4 @@
-import { employees } from "@/data/employees";
+import { prisma } from "@/lib/prisma";
 import type { Employee } from "@/types/employee";
 
 export interface EmployeeQuery {
@@ -19,22 +19,50 @@ export interface PaginatedEmployees {
   totalPages: number;
 }
 
-const getEmployeeName = (employee: Employee): string =>
-  `${employee.firstName} ${employee.lastName}`;
+type PrismaEmployee = Awaited<
+  ReturnType<typeof prisma.employee.findMany>
+>[number];
 
-export const getEmployees = (): Employee[] => {
-  return [...employees];
-};
+function mapEmployee(employee: PrismaEmployee): Employee {
+  return {
+    id: employee.id,
+    employeeCode: employee.employeeCode,
+    firstName: employee.firstName,
+    lastName: employee.lastName,
+    email: employee.email,
+    departmentId: employee.departmentId,
+    designation: employee.designation,
+    joiningDate: employee.joinDate.toISOString().slice(0, 10),
+    ...(employee.resignationDate
+      ? {
+          resignationDate: employee.resignationDate.toISOString().slice(0, 10),
+        }
+      : {}),
+    status: employee.status.toLowerCase() as Employee["status"],
+  };
+}
 
-export const getEmployeeById = (
+export async function getEmployees(): Promise<Employee[]> {
+  const employees = await prisma.employee.findMany({
+    orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+  });
+
+  return employees.map(mapEmployee);
+}
+
+export async function getEmployeeById(
   employeeId: string,
-): Employee | undefined => {
-  return employees.find((employee) => employee.id === employeeId);
-};
+): Promise<Employee | undefined> {
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+  });
 
-export const queryEmployees = (
+  return employee ? mapEmployee(employee) : undefined;
+}
+
+export async function queryEmployees(
   query: EmployeeQuery = {},
-): PaginatedEmployees => {
+): Promise<PaginatedEmployees> {
   const {
     search = "",
     departmentId,
@@ -45,75 +73,86 @@ export const queryEmployees = (
     pageSize = 10,
   } = query;
 
-  const normalizedSearch = search.trim().toLowerCase();
+  const normalizedSearch = search.trim();
+  const safePageSize = Number.isFinite(pageSize)
+    ? Math.max(1, Math.floor(pageSize))
+    : 10;
+  const requestedPage = Number.isFinite(page)
+    ? Math.max(1, Math.floor(page))
+    : 1;
 
-  const filteredEmployees = employees.filter((employee) => {
-    const matchesSearch =
-      normalizedSearch.length === 0 ||
-      [
-        employee.firstName,
-        employee.lastName,
-        employee.email,
-        employee.employeeCode,
-        employee.designation,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalizedSearch);
+  const where = {
+    ...(normalizedSearch
+      ? {
+          OR: [
+            {
+              firstName: {
+                contains: normalizedSearch,
+                mode: "insensitive" as const,
+              },
+            },
+            {
+              lastName: {
+                contains: normalizedSearch,
+                mode: "insensitive" as const,
+              },
+            },
+            {
+              email: {
+                contains: normalizedSearch,
+                mode: "insensitive" as const,
+              },
+            },
+            {
+              employeeCode: {
+                contains: normalizedSearch,
+                mode: "insensitive" as const,
+              },
+            },
+            {
+              designation: {
+                contains: normalizedSearch,
+                mode: "insensitive" as const,
+              },
+            },
+          ],
+        }
+      : {}),
+    ...(departmentId ? { departmentId } : {}),
+    ...(status
+      ? {
+          status: status.toUpperCase() as
+            | "ACTIVE"
+            | "INACTIVE"
+            | "ON_LEAVE"
+            | "RESIGNED",
+        }
+      : {}),
+  };
 
-    const matchesDepartment =
-      !departmentId || employee.departmentId === departmentId;
+  const orderBy =
+    sortBy === "joiningDate"
+      ? { joinDate: sortOrder }
+      : sortBy === "employeeCode"
+        ? { employeeCode: sortOrder }
+        : [{ firstName: sortOrder }, { lastName: sortOrder }];
 
-    const matchesStatus = !status || employee.status === status;
-
-    return matchesSearch && matchesDepartment && matchesStatus;
-  });
-
-  filteredEmployees.sort((first, second) => {
-    let firstValue: string;
-    let secondValue: string;
-
-    switch (sortBy) {
-      case "joiningDate":
-        firstValue = first.joiningDate;
-        secondValue = second.joiningDate;
-        break;
-
-      case "employeeCode":
-        firstValue = first.employeeCode;
-        secondValue = second.employeeCode;
-        break;
-
-      case "name":
-      default:
-        firstValue = getEmployeeName(first);
-        secondValue = getEmployeeName(second);
-        break;
-    }
-
-    const comparison = firstValue.localeCompare(secondValue);
-
-    return sortOrder === "asc" ? comparison : -comparison;
-  });
-
-  const total = filteredEmployees.length;
-  const safePageSize = Math.max(1, pageSize);
+  const total = await prisma.employee.count({ where });
   const totalPages = Math.max(1, Math.ceil(total / safePageSize));
+  const safePage = Math.min(requestedPage, totalPages);
 
-  const safePage = Math.min(Math.max(1, page), totalPages);
-
-  const startIndex = (safePage - 1) * safePageSize;
-
-  const data = filteredEmployees.slice(
-    startIndex,
-    startIndex + safePageSize,
-  );
+  const employees = await prisma.employee.findMany({
+    where,
+    orderBy,
+    skip: (safePage - 1) * safePageSize,
+    take: safePageSize,
+  });
 
   return {
-    data,
+    data: employees.map(mapEmployee),
     total,
     page: safePage,
     pageSize: safePageSize,
     totalPages,
   };
-};
+}
