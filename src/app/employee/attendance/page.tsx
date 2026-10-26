@@ -65,13 +65,15 @@ function SummaryCard({ label, value }: SummaryCardProps) {
   );
 }
 
-export default function MyAttendancePage() {
+export default async function MyAttendancePage() {
   const employeeId = mockSessions.employee.employeeId;
 
   const employee = employees.find((item) => item.id === employeeId);
 
-  const records = getEmployeeAttendance(employeeId);
-  const summary = calculateAttendanceSummary(employeeId);
+  const [records, summary] = await Promise.all([
+    getEmployeeAttendance(employeeId),
+    calculateAttendanceSummary(employeeId),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -151,7 +153,7 @@ export default function MyAttendancePage() {
               <tbody className="divide-y">
                 {records.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
-                    <td className="px-5 py-4 whitespace-nowrap text-gray-700">
+                    <td className="whitespace-nowrap px-5 py-4 text-gray-700">
                       {formatDate(record.date)}
                     </td>
 

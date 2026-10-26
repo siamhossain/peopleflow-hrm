@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { LeaveRequest } from "@/types/leave";
+import type { AttendanceRecord } from "@/types/attendance";
 
 import { employees } from "@/data/employees";
-import { getAttendance } from "@/services/attendanceService";
 import {
   getDashboardStats,
   getLatestAttendanceDate,
@@ -16,9 +16,7 @@ const getMonthDateRange = (month: string) => {
   const [year, monthNumber] = month.split("-").map(Number);
 
   const startDate = `${year}-${String(monthNumber).padStart(2, "0")}-01`;
-
   const lastDay = new Date(year, monthNumber, 0).getDate();
-
   const endDate = `${year}-${String(monthNumber).padStart(2, "0")}-${String(
     lastDay,
   ).padStart(2, "0")}`;
@@ -35,63 +33,125 @@ const formatMonth = (month: string) => {
   }).format(new Date(year, monthNumber - 1, 1));
 };
 
+interface AttendanceApiResponse {
+  data?: AttendanceRecord[];
+  error?: string;
+}
+
+interface LeaveRequestsApiResponse {
+  data?: LeaveRequest[];
+  error?: string;
+}
+
 export default function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState(DEFAULT_MONTH);
+
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<
+    AttendanceRecord[]
+  >([]);
+
+  const [attendanceLoading, setAttendanceLoading] = useState(true);
+  const [attendanceError, setAttendanceError] = useState("");
 
   const reportDate = getLatestAttendanceDate();
   const stats = getDashboardStats(reportDate);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
-    fetch("/api/leave/requests?all=true")
-      .then((response) => {
+    async function fetchLeaveRequests() {
+      try {
+        const response = await fetch("/api/leave/requests?all=true", {
+          signal: controller.signal,
+        });
+
+        const result = (await response.json()) as LeaveRequestsApiResponse;
+
         if (!response.ok) {
-          throw new Error("Failed to load leave requests.");
+          throw new Error(result.error ?? "Failed to load leave requests.");
         }
 
-        return response.json() as Promise<LeaveRequest[]>;
-      })
-      .then((requests) => {
-        if (!cancelled) {
-          setLeaveRequests(requests);
+        if (!controller.signal.aborted) {
+          setLeaveRequests(result.data ?? []);
         }
-      })
-      .catch((error: unknown) => {
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+
         console.error("Failed to load leave requests:", error);
-      });
+      }
+    }
 
-    return () => {
-      cancelled = true;
-    };
+    void fetchLeaveRequests();
+
+    return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function fetchMonthlyAttendance() {
+      setAttendanceLoading(true);
+      setAttendanceError("");
+
+      try {
+        const { startDate, endDate } = getMonthDateRange(selectedMonth);
+        const params = new URLSearchParams({ startDate, endDate });
+
+        const response = await fetch(`/api/attendance?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        const result = (await response.json()) as AttendanceApiResponse;
+
+        if (!response.ok) {
+          throw new Error(result.error ?? "Failed to load monthly attendance.");
+        }
+
+        setAttendanceRecords(result.data ?? []);
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+
+        setAttendanceRecords([]);
+        setAttendanceError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load monthly attendance.",
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setAttendanceLoading(false);
+        }
+      }
+    }
+
+    void fetchMonthlyAttendance();
+
+    return () => controller.abort();
+  }, [selectedMonth]);
+
   const monthlyAttendance = useMemo(() => {
-    const { startDate, endDate } = getMonthDateRange(selectedMonth);
-
-    const records = getAttendance({
-      startDate,
-      endDate,
-    });
-
-    const presentDays = records.filter(
+    const presentDays = attendanceRecords.filter(
       (record) => record.status === "present",
     ).length;
 
-    const lateDays = records.filter(
+    const lateDays = attendanceRecords.filter(
       (record) => record.status === "late",
     ).length;
 
-    const halfDays = records.filter(
+    const halfDays = attendanceRecords.filter(
       (record) => record.status === "half_day",
     ).length;
 
-    const absentDays = records.filter(
+    const absentDays = attendanceRecords.filter(
       (record) => record.status === "absent",
     ).length;
 
-    const leaveDays = records.filter(
+    const leaveDays = attendanceRecords.filter(
       (record) => record.status === "leave",
     ).length;
 
@@ -105,13 +165,13 @@ export default function ReportsPage() {
         ? 0
         : Number(((attendanceDays / totalWorkingRecords) * 100).toFixed(2));
 
-    const totalLateMinutes = records.reduce(
+    const totalLateMinutes = attendanceRecords.reduce(
       (total, record) => total + (record.lateMinutes ?? 0),
       0,
     );
 
     return {
-      totalRecords: records.length,
+      totalRecords: attendanceRecords.length,
       presentDays,
       lateDays,
       halfDays,
@@ -120,7 +180,7 @@ export default function ReportsPage() {
       attendancePercentage,
       totalLateMinutes,
     };
-  }, [selectedMonth]);
+  }, [attendanceRecords]);
 
   const reportCards = [
     {
@@ -209,63 +269,71 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg bg-gray-50 p-4">
-            <p className="text-sm text-gray-500">Attendance Rate</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {monthlyAttendance.attendancePercentage}%
-            </p>
-          </div>
+        {attendanceLoading ? (
+          <p className="mt-6 text-sm text-gray-500">
+            Loading monthly attendance…
+          </p>
+        ) : attendanceError ? (
+          <p className="mt-6 text-sm text-red-700">{attendanceError}</p>
+        ) : (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Attendance Rate</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {monthlyAttendance.attendancePercentage}%
+              </p>
+            </div>
 
-          <div className="rounded-lg bg-gray-50 p-4">
-            <p className="text-sm text-gray-500">Present</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {monthlyAttendance.presentDays}
-            </p>
-          </div>
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Present</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {monthlyAttendance.presentDays}
+              </p>
+            </div>
 
-          <div className="rounded-lg bg-gray-50 p-4">
-            <p className="text-sm text-gray-500">Late</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {monthlyAttendance.lateDays}
-            </p>
-          </div>
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Late</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {monthlyAttendance.lateDays}
+              </p>
+            </div>
 
-          <div className="rounded-lg bg-gray-50 p-4">
-            <p className="text-sm text-gray-500">Half Day</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {monthlyAttendance.halfDays}
-            </p>
-          </div>
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Half Day</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {monthlyAttendance.halfDays}
+              </p>
+            </div>
 
-          <div className="rounded-lg bg-gray-50 p-4">
-            <p className="text-sm text-gray-500">Absent</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {monthlyAttendance.absentDays}
-            </p>
-          </div>
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Absent</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {monthlyAttendance.absentDays}
+              </p>
+            </div>
 
-          <div className="rounded-lg bg-gray-50 p-4">
-            <p className="text-sm text-gray-500">On Leave</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {monthlyAttendance.leaveDays}
-            </p>
-          </div>
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">On Leave</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {monthlyAttendance.leaveDays}
+              </p>
+            </div>
 
-          <div className="rounded-lg bg-gray-50 p-4">
-            <p className="text-sm text-gray-500">Late Minutes</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {monthlyAttendance.totalLateMinutes}
-            </p>
-          </div>
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Late Minutes</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {monthlyAttendance.totalLateMinutes}
+              </p>
+            </div>
 
-          <div className="rounded-lg bg-gray-50 p-4">
-            <p className="text-sm text-gray-500">Total Records</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {monthlyAttendance.totalRecords}
-            </p>
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">Total Records</p>
+              <p className="mt-1 text-2xl font-bold text-gray-900">
+                {monthlyAttendance.totalRecords}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="mt-6 rounded-xl border bg-white p-6 shadow-sm">

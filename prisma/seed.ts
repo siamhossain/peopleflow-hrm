@@ -2,10 +2,11 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 
+import { attendanceRecords } from "../src/data/attendance";
 import { departments } from "../src/data/departments";
 import { employees } from "../src/data/employees";
+import { leaveRequests } from "../src/data/leaveRequests";
 import { leaveTypes } from "../src/data/leaveTypes";
-import { leaveRequests } from "@/data/leaveRequests";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -13,18 +14,33 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not defined");
 }
 
-const adapter = new PrismaPg({
-  connectionString,
-});
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
-const prisma = new PrismaClient({
-  adapter,
-});
+const attendanceStatusMap = {
+  present: "PRESENT",
+  absent: "ABSENT",
+  late: "LATE",
+  half_day: "HALF_DAY",
+  leave: "ON_LEAVE",
+  holiday: "HOLIDAY",
+  weekend: "WEEKEND",
+} as const;
+
+const toDateTime = (date: string, time?: string): Date | null => {
+  if (!time) {
+    return null;
+  }
+
+  return new Date(`${date}T${time}:00`);
+};
 
 async function main() {
-  console.log("🌱 Starting database seed...");
+  console.log("Starting database seed...");
 
   await prisma.$transaction(async (tx) => {
+    // WARNING: This resets the existing seeded HRM data.
+    // Do not run against data you need to preserve.
     await tx.attendanceRecord.deleteMany();
     await tx.leaveRequest.deleteMany();
     await tx.user.deleteMany();
@@ -42,7 +58,7 @@ async function main() {
       })),
     });
 
-    console.log(`✓ Departments seeded: ${departments.length}`);
+    console.log(`Departments seeded: ${departments.length}`);
 
     await tx.employee.createMany({
       data: employees.map((employee) => ({
@@ -60,9 +76,12 @@ async function main() {
         status: employee.status.toUpperCase() as
           | "ACTIVE"
           | "INACTIVE"
-          | "ON_LEAVE",
+          | "ON_LEAVE"
+          | "RESIGNED",
       })),
     });
+
+    console.log(`Employees seeded: ${employees.length}`);
 
     await tx.leaveType.createMany({
       data: leaveTypes.map((leaveType) => ({
@@ -98,18 +117,34 @@ async function main() {
       })),
     });
 
-    console.log(`✓ Employees seeded: ${employees.length}`);
-    console.log(`✓ Leave types seeded: ${leaveTypes.length}`);
-    console.log(`✓ Leave requests seeded: ${leaveRequests.length}`);
+    console.log(`Leave types seeded: ${leaveTypes.length}`);
+    console.log(`Leave requests seeded: ${leaveRequests.length}`);
+
+    await tx.attendanceRecord.createMany({
+      data: attendanceRecords.map((record) => ({
+        id: record.id,
+        employeeId: record.employeeId,
+        date: new Date(`${record.date}T00:00:00`),
+        status: attendanceStatusMap[record.status],
+        checkIn: toDateTime(record.date, record.checkIn),
+        checkOut: toDateTime(record.date, record.checkOut),
+        workHours:
+          record.workingMinutes === undefined
+            ? null
+            : record.workingMinutes / 60,
+      })),
+    });
+
+    console.log(`Attendance records seeded: ${attendanceRecords.length}`);
   });
 
-  console.log("🌱 Database seed completed.");
+  console.log("Database seed completed.");
 }
 
 main()
-  .catch((error) => {
-    console.error("❌ Database seed failed:", error);
-    process.exit(1);
+  .catch((error: unknown) => {
+    console.error("Database seed failed:", error);
+    process.exitCode = 1;
   })
   .finally(async () => {
     await prisma.$disconnect();

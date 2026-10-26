@@ -1,18 +1,13 @@
-import { attendanceRecords } from "@/data/attendance";
-import { attendanceSettings } from "@/data/settings";
-import { employees } from "@/data/employees";
-import { holidays } from "@/data/holidays";
-import { departments } from "@/data/departments";
+import { prisma } from "@/lib/prisma";
 import type { AttendanceRecord } from "@/types/attendance";
 import type { AttendanceStatus } from "@/types/attendance";
-
 
 export interface AttendanceQuery {
   employeeId?: string;
   departmentId?: string;
   startDate?: string;
   endDate?: string;
-  status?: AttendanceRecord["status"];
+  status?: AttendanceStatus;
 }
 
 export interface AttendanceSummary {
@@ -39,219 +34,308 @@ export interface AttendanceListItem {
   lateMinutes?: number;
 }
 
-export const getAttendanceByDate = (
-  date: string,
-): AttendanceListItem[] => {
-  const records: (AttendanceListItem | null)[] = attendanceRecords
-    .filter((record) => record.date === date)
-    .map((record): AttendanceListItem | null => {
-      const employee = employees.find(
-        (item) => item.id === record.employeeId,
-      );
+export interface PaginatedAttendance {
+  data: AttendanceListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
 
-      if (!employee) {
-        return null;
-      }
+const statusToDatabase = {
+  present: "PRESENT",
+  late: "LATE",
+  half_day: "HALF_DAY",
+  absent: "ABSENT",
+  leave: "ON_LEAVE",
+  holiday: "HOLIDAY",
+  weekend: "WEEKEND",
+} as const;
 
-      const department = departments.find(
-        (item) => item.id === employee.departmentId,
-      );
-
-      return {
-        id: record.id,
-        employeeId: record.employeeId,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
-        department: department?.name ?? "Unknown",
-        date: record.date,
-        status: record.status,
-        checkIn: record.checkIn,
-        checkOut: record.checkOut,
-        workingMinutes: record.workingMinutes,
-        lateMinutes: record.lateMinutes,
-      };
-    });
-
-  return records.filter(
-    (record): record is AttendanceListItem => record !== null,
-  );
+const statusFromDatabase: Record<string, AttendanceStatus> = {
+  PRESENT: "present",
+  LATE: "late",
+  HALF_DAY: "half_day",
+  ABSENT: "absent",
+  ON_LEAVE: "leave",
+  HOLIDAY: "holiday",
+  WEEKEND: "weekend",
 };
 
-export const getAttendanceList = (
-  query: AttendanceQuery = {},
-): AttendanceListItem[] => {
-  const records = getAttendance(query);
+const toDateString = (date: Date): string => date.toISOString().slice(0, 10);
 
-  return records
-    .map((record): AttendanceListItem | null => {
-      const employee = employees.find(
-        (item) => item.id === record.employeeId,
-      );
+const toTimeString = (date?: Date | null): string | undefined =>
+  date
+    ? `${String(date.getUTCHours()).padStart(2, "0")}:${String(
+        date.getUTCMinutes(),
+      ).padStart(2, "0")}`
+    : undefined;
 
-      if (!employee) {
-        return null;
-      }
+const toMinutes = (time?: string | null): number | undefined => {
+  if (!time) return undefined;
 
-      const department = departments.find(
-        (item) => item.id === employee.departmentId,
-      );
-
-      return {
-        id: record.id,
-        employeeId: record.employeeId,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
-        department: department?.name ?? "Unknown",
-        date: record.date,
-        status: record.status,
-        checkIn: record.checkIn,
-        checkOut: record.checkOut,
-        workingMinutes: record.workingMinutes,
-        lateMinutes: record.lateMinutes,
-      };
-    })
-    .filter(
-      (record): record is AttendanceListItem =>
-        record !== null,
-    );
-};
-
-const isDateInRange = (
-  date: string,
-  startDate?: string,
-  endDate?: string,
-): boolean => {
-  if (startDate && date < startDate) {
-    return false;
-  }
-
-  if (endDate && date > endDate) {
-    return false;
-  }
-
-  return true;
-};
-
-const isEmployeeActiveOnDate = (
-  employeeId: string,
-  date: string,
-): boolean => {
-  const employee = employees.find(
-    (item) => item.id === employeeId,
-  );
-
-  if (!employee) {
-    return false;
-  }
-
-  if (date < employee.joiningDate) {
-    return false;
-  }
+  const [hours, minutes] = time.split(":").map(Number);
 
   if (
-    employee.resignationDate &&
-    date > employee.resignationDate
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
   ) {
-    return false;
+    return undefined;
   }
 
-  return true;
+  return hours * 60 + minutes;
 };
 
-const isHoliday = (date: string): boolean => {
-  return holidays.some(
-    (holiday) => holiday.date === date,
-  );
+const calculateLateMinutes = (
+  checkIn?: Date | null,
+  workStartTime?: string,
+  gracePeriod = 0,
+): number | undefined => {
+  if (!checkIn || !workStartTime) return undefined;
+
+  const actualMinutes = checkIn.getUTCHours() * 60 + checkIn.getUTCMinutes();
+  const scheduledMinutes = toMinutes(workStartTime);
+
+  if (scheduledMinutes === undefined) return undefined;
+
+  return Math.max(0, actualMinutes - scheduledMinutes - gracePeriod);
 };
 
-const isWorkingDay = (date: string): boolean => {
-  const day = new Date(`${date}T00:00:00`).getDay();
+const mapAttendance = (
+  record: {
+    id: string;
+    employeeId: string;
+    date: Date;
+    status: string;
+    checkIn: Date | null;
+    checkOut: Date | null;
+    workHours: number | null;
+  },
+  workStartTime?: string,
+  gracePeriod = 0,
+): AttendanceRecord => {
+  const checkIn = toTimeString(record.checkIn);
+  const checkOut = toTimeString(record.checkOut);
 
-  return (
-    attendanceSettings.workingDays.includes(day) &&
-    !isHoliday(date)
-  );
+  const workingMinutes =
+    record.workHours == null ? undefined : Math.round(record.workHours * 60);
+
+  const lateMinutes =
+    record.status === "LATE"
+      ? calculateLateMinutes(record.checkIn, workStartTime, gracePeriod)
+      : record.status === "PRESENT"
+        ? 0
+        : undefined;
+
+  return {
+    id: record.id,
+    employeeId: record.employeeId,
+    date: toDateString(record.date),
+    status: statusFromDatabase[record.status],
+    ...(checkIn ? { checkIn } : {}),
+    ...(checkOut ? { checkOut } : {}),
+    ...(workingMinutes !== undefined ? { workingMinutes } : {}),
+    ...(lateMinutes !== undefined ? { lateMinutes } : {}),
+  };
 };
 
-export const getAttendance = (
-  query: AttendanceQuery = {},
-): AttendanceRecord[] => {
-  return attendanceRecords.filter((record) => {
-    const employee = employees.find(
-      (item) => item.id === record.employeeId,
-    );
-
-    if (!employee) {
-      return false;
-    }
-
-    if (
-      query.employeeId &&
-      record.employeeId !== query.employeeId
-    ) {
-      return false;
-    }
-
-    if (
-      query.departmentId &&
-      employee.departmentId !== query.departmentId
-    ) {
-      return false;
-    }
-
-    if (
-      query.status &&
-      record.status !== query.status
-    ) {
-      return false;
-    }
-
-    if (
-      !isDateInRange(
-        record.date,
-        query.startDate,
-        query.endDate,
-      )
-    ) {
-      return false;
-    }
-
-    if (
-      !isEmployeeActiveOnDate(
-        record.employeeId,
-        record.date,
-      )
-    ) {
-      return false;
-    }
-
-    return true;
+const getSettings = async () => {
+  return prisma.attendanceSettings.findFirst({
+    orderBy: { createdAt: "desc" },
   });
 };
 
-export const getEmployeeAttendance = (
+const buildDateFilter = (startDate?: string, endDate?: string) => {
+  if (!startDate && !endDate) return undefined;
+
+  const endExclusive = endDate
+    ? new Date(`${endDate}T00:00:00.000Z`)
+    : undefined;
+
+  if (endExclusive) {
+    endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+  }
+
+  return {
+    ...(startDate ? { gte: new Date(`${startDate}T00:00:00.000Z`) } : {}),
+    ...(endExclusive ? { lt: endExclusive } : {}),
+  };
+};
+
+const buildWhere = (query: AttendanceQuery) => {
+  const dateFilter = buildDateFilter(query.startDate, query.endDate);
+
+  return {
+    ...(query.employeeId ? { employeeId: query.employeeId } : {}),
+    ...(query.departmentId
+      ? { employee: { departmentId: query.departmentId } }
+      : {}),
+    ...(dateFilter ? { date: dateFilter } : {}),
+    ...(query.status ? { status: statusToDatabase[query.status] } : {}),
+  };
+};
+
+const mapListItem = (
+  record: {
+    id: string;
+    employeeId: string;
+    date: Date;
+    status: string;
+    checkIn: Date | null;
+    checkOut: Date | null;
+    workHours: number | null;
+    employee: {
+      firstName: string;
+      lastName: string;
+      department: { name: string };
+    };
+  },
+  workStartTime?: string,
+  gracePeriod = 0,
+): AttendanceListItem => {
+  const attendance = mapAttendance(record, workStartTime, gracePeriod);
+
+  return {
+    ...attendance,
+    employeeName: `${record.employee.firstName} ${record.employee.lastName}`,
+    department: record.employee.department.name,
+  };
+};
+
+export async function getAttendance(
+  query: AttendanceQuery = {},
+): Promise<AttendanceRecord[]> {
+  const [records, settings] = await Promise.all([
+    prisma.attendanceRecord.findMany({
+      where: buildWhere(query),
+      include: {
+        employee: {
+          select: {
+            joinDate: true,
+            resignationDate: true,
+          },
+        },
+      },
+      orderBy: [{ date: "desc" }, { employeeId: "asc" }],
+    }),
+    getSettings(),
+  ]);
+
+  return records
+    .filter((record) => {
+      const date = toDateString(record.date);
+      const joinDate = toDateString(record.employee.joinDate);
+      const resignationDate = record.employee.resignationDate
+        ? toDateString(record.employee.resignationDate)
+        : undefined;
+
+      return date >= joinDate && (!resignationDate || date <= resignationDate);
+    })
+    .map((record) =>
+      mapAttendance(
+        record,
+        settings?.workStartTime,
+        settings?.gracePeriod ?? 0,
+      ),
+    );
+}
+
+export async function getAttendanceList(
+  query: AttendanceQuery = {},
+): Promise<AttendanceListItem[]> {
+  const [records, settings] = await Promise.all([
+    prisma.attendanceRecord.findMany({
+      where: buildWhere(query),
+      include: {
+        employee: {
+          select: {
+            firstName: true,
+            lastName: true,
+            joinDate: true,
+            resignationDate: true,
+            department: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: [{ date: "desc" }, { employeeId: "asc" }],
+    }),
+    getSettings(),
+  ]);
+
+  return records
+    .filter((record) => {
+      const date = toDateString(record.date);
+      const joinDate = toDateString(record.employee.joinDate);
+      const resignationDate = record.employee.resignationDate
+        ? toDateString(record.employee.resignationDate)
+        : undefined;
+
+      return date >= joinDate && (!resignationDate || date <= resignationDate);
+    })
+    .map((record) =>
+      mapListItem(record, settings?.workStartTime, settings?.gracePeriod ?? 0),
+    );
+}
+
+export async function getPaginatedAttendanceList(
+  query: AttendanceQuery = {},
+  page = 1,
+  pageSize = 25,
+): Promise<PaginatedAttendance> {
+  const safePage = Math.max(1, Math.floor(page));
+  const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
+
+  // Apply all attendance filters and employee eligibility rules first.
+  const records = await getAttendanceList(query);
+
+  const total = records.length;
+  const totalPages = Math.max(1, Math.ceil(total / safePageSize));
+  const currentPage = Math.min(safePage, totalPages);
+  const startIndex = (currentPage - 1) * safePageSize;
+
+  return {
+    data: records.slice(startIndex, startIndex + safePageSize),
+    total,
+    page: currentPage,
+    pageSize: safePageSize,
+    totalPages,
+  };
+}
+
+export async function getAttendanceByDate(
+  date: string,
+): Promise<AttendanceListItem[]> {
+  return getAttendanceList({
+    startDate: date,
+    endDate: date,
+  });
+}
+
+export async function getEmployeeAttendance(
   employeeId: string,
   startDate?: string,
   endDate?: string,
-): AttendanceRecord[] => {
+): Promise<AttendanceRecord[]> {
   return getAttendance({
     employeeId,
     startDate,
     endDate,
   });
-};
+}
 
-export const calculateAttendanceSummary = (
+export async function calculateAttendanceSummary(
   employeeId: string,
   startDate?: string,
   endDate?: string,
-): AttendanceSummary => {
-  const records = getEmployeeAttendance(
-    employeeId,
-    startDate,
-    endDate,
-  );
+): Promise<AttendanceSummary> {
+  const records = await getEmployeeAttendance(employeeId, startDate, endDate);
 
-  const workingRecords = records.filter((record) =>
-    isWorkingDay(record.date),
+  const workingRecords = records.filter(
+    (record) => record.status !== "holiday" && record.status !== "weekend",
   );
 
   const presentDays = workingRecords.filter(
@@ -281,17 +365,12 @@ export const calculateAttendanceSummary = (
 
   const totalWorkingDays = workingRecords.length;
 
-  const attendanceDays =
-    presentDays +
-    lateDays +
-    halfDays * 0.5;
+  const attendanceDays = presentDays + lateDays + halfDays * 0.5;
 
   const attendancePercentage =
     totalWorkingDays === 0
       ? 0
-      : Number(
-          ((attendanceDays / totalWorkingDays) * 100).toFixed(2),
-        );
+      : Number(((attendanceDays / totalWorkingDays) * 100).toFixed(2));
 
   return {
     totalWorkingDays,
@@ -303,4 +382,4 @@ export const calculateAttendanceSummary = (
     attendancePercentage,
     totalLateMinutes,
   };
-};
+}
