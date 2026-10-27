@@ -1,14 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { LeaveRequest } from "@/types/leave";
-import type { AttendanceRecord } from "@/types/attendance";
 
-import { employees } from "@/data/employees";
-import {
-  getDashboardStats,
-  getLatestAttendanceDate,
-} from "@/services/dashboardService";
+import type { AttendanceRecord } from "@/types/attendance";
+import type { LeaveRequest } from "@/types/leave";
+import type { DashboardStats } from "@/services/dashboardService";
 
 const DEFAULT_MONTH = "2026-08";
 
@@ -33,8 +29,22 @@ const formatMonth = (month: string) => {
   }).format(new Date(year, monthNumber - 1, 1));
 };
 
+interface DashboardApiResponse {
+  data?: {
+    date: string;
+    stats: DashboardStats;
+  };
+  error?: string;
+}
+
 interface AttendanceApiResponse {
-  data?: AttendanceRecord[];
+  data?: {
+    data: AttendanceRecord[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
   error?: string;
 }
 
@@ -46,21 +56,76 @@ interface LeaveRequestsApiResponse {
 export default function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState(DEFAULT_MONTH);
 
+  const [reportDate, setReportDate] = useState("");
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState("");
+
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [leaveError, setLeaveError] = useState("");
+
   const [attendanceRecords, setAttendanceRecords] = useState<
     AttendanceRecord[]
   >([]);
-
   const [attendanceLoading, setAttendanceLoading] = useState(true);
   const [attendanceError, setAttendanceError] = useState("");
 
-  const reportDate = getLatestAttendanceDate();
-  const stats = getDashboardStats(reportDate);
+  // Load database-backed dashboard statistics.
+  useEffect(() => {
+    const controller = new AbortController();
 
+    async function fetchDashboardStats() {
+      setDashboardLoading(true);
+      setDashboardError("");
+
+      try {
+        const response = await fetch("/api/dashboard", {
+          signal: controller.signal,
+        });
+
+        const result = (await response.json()) as DashboardApiResponse;
+
+        if (!response.ok || !result.data) {
+          throw new Error(
+            result.error ?? "Failed to load dashboard statistics.",
+          );
+        }
+
+        if (!controller.signal.aborted) {
+          setReportDate(result.data.date);
+          setStats(result.data.stats);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+
+        if (!controller.signal.aborted) {
+          setDashboardError(
+            error instanceof Error
+              ? error.message
+              : "Failed to load dashboard statistics.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setDashboardLoading(false);
+        }
+      }
+    }
+
+    void fetchDashboardStats();
+
+    return () => controller.abort();
+  }, []);
+
+  // Load leave requests from the API.
   useEffect(() => {
     const controller = new AbortController();
 
     async function fetchLeaveRequests() {
+      setLeaveError("");
+
       try {
         const response = await fetch("/api/leave/requests?all=true", {
           signal: controller.signal,
@@ -80,7 +145,13 @@ export default function ReportsPage() {
           return;
         }
 
-        console.error("Failed to load leave requests:", error);
+        if (!controller.signal.aborted) {
+          setLeaveError(
+            error instanceof Error
+              ? error.message
+              : "Failed to load leave requests.",
+          );
+        }
       }
     }
 
@@ -89,39 +160,86 @@ export default function ReportsPage() {
     return () => controller.abort();
   }, []);
 
+  // Load every page of monthly attendance records.
   useEffect(() => {
     const controller = new AbortController();
 
     async function fetchMonthlyAttendance() {
       setAttendanceLoading(true);
       setAttendanceError("");
+      setAttendanceRecords([]);
 
       try {
         const { startDate, endDate } = getMonthDateRange(selectedMonth);
-        const params = new URLSearchParams({ startDate, endDate });
+        const pageSize = 100;
 
-        const response = await fetch(`/api/attendance?${params.toString()}`, {
-          signal: controller.signal,
+        const firstParams = new URLSearchParams({
+          startDate,
+          endDate,
+          page: "1",
+          pageSize: String(pageSize),
         });
 
-        const result = (await response.json()) as AttendanceApiResponse;
+        const firstResponse = await fetch(
+          `/api/attendance?${firstParams.toString()}`,
+          { signal: controller.signal },
+        );
 
-        if (!response.ok) {
-          throw new Error(result.error ?? "Failed to load monthly attendance.");
+        const firstResult =
+          (await firstResponse.json()) as AttendanceApiResponse;
+
+        if (!firstResponse.ok || !firstResult.data) {
+          throw new Error(
+            firstResult.error ?? "Failed to load monthly attendance.",
+          );
         }
 
-        setAttendanceRecords(result.data ?? []);
+        const allRecords = [...firstResult.data.data];
+        const totalPages = firstResult.data.totalPages;
+
+        for (let page = 2; page <= totalPages; page += 1) {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          const params = new URLSearchParams({
+            startDate,
+            endDate,
+            page: String(page),
+            pageSize: String(pageSize),
+          });
+
+          const response = await fetch(`/api/attendance?${params.toString()}`, {
+            signal: controller.signal,
+          });
+
+          const result = (await response.json()) as AttendanceApiResponse;
+
+          if (!response.ok || !result.data) {
+            throw new Error(
+              result.error ?? `Failed to load attendance page ${page}.`,
+            );
+          }
+
+          allRecords.push(...result.data.data);
+        }
+
+        if (!controller.signal.aborted) {
+          setAttendanceRecords(allRecords);
+        }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           return;
         }
 
-        setAttendanceRecords([]);
-        setAttendanceError(
-          error instanceof Error
-            ? error.message
-            : "Failed to load monthly attendance.",
-        );
+        if (!controller.signal.aborted) {
+          setAttendanceRecords([]);
+          setAttendanceError(
+            error instanceof Error
+              ? error.message
+              : "Failed to load monthly attendance.",
+          );
+        }
       } finally {
         if (!controller.signal.aborted) {
           setAttendanceLoading(false);
@@ -185,30 +303,36 @@ export default function ReportsPage() {
   const reportCards = [
     {
       label: "Total Employees",
-      value: stats.totalEmployees,
+      value: stats?.totalEmployees ?? "—",
     },
     {
       label: "Attendance Rate",
-      value: `${stats.attendanceRate}%`,
+      value: stats ? `${stats.attendanceRate}%` : "—",
     },
     {
       label: "Pending Leave Requests",
-      value: stats.pendingLeaveRequests,
+      value: stats?.pendingLeaveRequests ?? "—",
     },
     {
       label: "Approved Leave Requests",
-      value: leaveRequests.filter((request) => request.status === "approved")
-        .length,
+      value: leaveError
+        ? "—"
+        : leaveRequests.filter((request) => request.status === "approved")
+            .length,
     },
     {
       label: "Rejected Leave Requests",
-      value: leaveRequests.filter((request) => request.status === "rejected")
-        .length,
+      value: leaveError
+        ? "—"
+        : leaveRequests.filter((request) => request.status === "rejected")
+            .length,
     },
     {
       label: "Cancelled Leave Requests",
-      value: leaveRequests.filter((request) => request.status === "cancelled")
-        .length,
+      value: leaveError
+        ? "—"
+        : leaveRequests.filter((request) => request.status === "cancelled")
+            .length,
     },
   ];
 
@@ -224,6 +348,24 @@ export default function ReportsPage() {
         </p>
       </div>
 
+      {dashboardError && (
+        <div
+          role="alert"
+          className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+        >
+          Unable to load dashboard statistics: {dashboardError}
+        </div>
+      )}
+
+      {leaveError && (
+        <div
+          role="alert"
+          className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+        >
+          Unable to load leave-request totals: {leaveError}
+        </div>
+      )}
+
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {reportCards.map((card) => (
           <div
@@ -233,7 +375,7 @@ export default function ReportsPage() {
             <p className="text-sm text-gray-500">{card.label}</p>
 
             <p className="mt-2 text-2xl font-bold text-gray-900">
-              {card.value}
+              {dashboardLoading ? "…" : card.value}
             </p>
           </div>
         ))}
@@ -274,7 +416,9 @@ export default function ReportsPage() {
             Loading monthly attendance…
           </p>
         ) : attendanceError ? (
-          <p className="mt-6 text-sm text-red-700">{attendanceError}</p>
+          <p role="alert" className="mt-6 text-sm text-red-700">
+            {attendanceError}
+          </p>
         ) : (
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg bg-gray-50 p-4">
@@ -341,46 +485,58 @@ export default function ReportsPage() {
           Daily Attendance Summary
         </h2>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div>
-            <p className="text-sm text-gray-500">Present</p>
-            <p className="mt-1 text-xl font-semibold text-gray-900">
-              {stats.presentToday}
-            </p>
-          </div>
+        {dashboardLoading ? (
+          <p className="mt-4 text-sm text-gray-500">
+            Loading daily attendance…
+          </p>
+        ) : stats ? (
+          <>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <div>
+                <p className="text-sm text-gray-500">Present</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">
+                  {stats.presentToday}
+                </p>
+              </div>
 
-          <div>
-            <p className="text-sm text-gray-500">Late</p>
-            <p className="mt-1 text-xl font-semibold text-gray-900">
-              {stats.lateToday}
-            </p>
-          </div>
+              <div>
+                <p className="text-sm text-gray-500">Late</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">
+                  {stats.lateToday}
+                </p>
+              </div>
 
-          <div>
-            <p className="text-sm text-gray-500">Half Day</p>
-            <p className="mt-1 text-xl font-semibold text-gray-900">
-              {stats.halfDayToday}
-            </p>
-          </div>
+              <div>
+                <p className="text-sm text-gray-500">Half Day</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">
+                  {stats.halfDayToday}
+                </p>
+              </div>
 
-          <div>
-            <p className="text-sm text-gray-500">Absent</p>
-            <p className="mt-1 text-xl font-semibold text-gray-900">
-              {stats.absentToday}
-            </p>
-          </div>
+              <div>
+                <p className="text-sm text-gray-500">Absent</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">
+                  {stats.absentToday}
+                </p>
+              </div>
 
-          <div>
-            <p className="text-sm text-gray-500">On Leave</p>
-            <p className="mt-1 text-xl font-semibold text-gray-900">
-              {stats.onLeaveToday}
-            </p>
-          </div>
-        </div>
+              <div>
+                <p className="text-sm text-gray-500">On Leave</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">
+                  {stats.onLeaveToday}
+                </p>
+              </div>
+            </div>
 
-        <p className="mt-5 text-xs text-gray-500">
-          Based on the latest attendance date in the system: {reportDate}
-        </p>
+            <p className="mt-5 text-xs text-gray-500">
+              Based on the latest attendance date in the system: {reportDate}
+            </p>
+          </>
+        ) : (
+          <p className="mt-4 text-sm text-gray-500">
+            Daily attendance statistics are unavailable.
+          </p>
+        )}
       </div>
 
       <div className="mt-6 rounded-xl border bg-white p-6 shadow-sm">
@@ -389,8 +545,11 @@ export default function ReportsPage() {
         </h2>
 
         <p className="mt-2 text-sm text-gray-600">
-          The current employee dataset contains {employees.length} employee
-          records, including active, inactive, on-leave, and resigned employees.
+          {dashboardLoading
+            ? "Loading employee data…"
+            : stats
+              ? `The database currently contains ${stats.totalEmployees} employees eligible for the selected attendance date.`
+              : "Employee statistics are unavailable."}
         </p>
       </div>
     </section>

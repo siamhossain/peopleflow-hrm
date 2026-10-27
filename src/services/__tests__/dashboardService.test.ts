@@ -1,56 +1,96 @@
-import { describe, expect, it } from "vitest";
-import { employees } from "@/data/employees";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { employeeCount, attendanceFindMany, leaveGroupBy } = vi.hoisted(() => ({
+  employeeCount: vi.fn(),
+  attendanceFindMany: vi.fn(),
+  leaveGroupBy: vi.fn(),
+}));
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    employee: {
+      count: employeeCount,
+    },
+    attendanceRecord: {
+      findMany: attendanceFindMany,
+    },
+    leaveRequest: {
+      groupBy: leaveGroupBy,
+    },
+  },
+}));
+
 import { getDashboardStats } from "@/services/dashboardService";
 
 describe("Dashboard Service", () => {
-  it("calculates dashboard statistics from attendance data", () => {
-    const stats = getDashboardStats("2026-08-20");
+  beforeEach(() => {
+    vi.clearAllMocks();
 
-    expect(stats.totalEmployees).toBeGreaterThan(0);
-
-    expect(stats.presentToday).toBeGreaterThanOrEqual(0);
-    expect(stats.lateToday).toBeGreaterThanOrEqual(0);
-    expect(stats.halfDayToday).toBeGreaterThanOrEqual(0);
-    expect(stats.absentToday).toBeGreaterThanOrEqual(0);
-    expect(stats.onLeaveToday).toBeGreaterThanOrEqual(0);
-
-    expect(stats.attendanceRate).toBeGreaterThanOrEqual(0);
-    expect(stats.attendanceRate).toBeLessThanOrEqual(100);
-
-    expect(stats.pendingLeaveRequests).toBeGreaterThanOrEqual(0);
+    employeeCount.mockResolvedValue(10);
+    attendanceFindMany.mockResolvedValue([
+      { status: "PRESENT" },
+      { status: "PRESENT" },
+      { status: "LATE" },
+      { status: "HALF_DAY" },
+      { status: "ABSENT" },
+      { status: "ON_LEAVE" },
+    ]);
+    leaveGroupBy.mockResolvedValue([
+      { status: "PENDING", _count: { _all: 2 } },
+      { status: "APPROVED", _count: { _all: 3 } },
+      { status: "REJECTED", _count: { _all: 1 } },
+      { status: "CANCELLED", _count: { _all: 0 } },
+    ]);
   });
 
-  it("does not count weekends as working attendance", () => {
-    const stats = getDashboardStats("2026-08-15");
+  it("calculates dashboard statistics from attendance data", async () => {
+    const stats = await getDashboardStats("2026-08-20");
 
+    expect(stats.totalEmployees).toBe(10);
+    expect(stats.presentToday).toBe(2);
+    expect(stats.lateToday).toBe(1);
+    expect(stats.halfDayToday).toBe(1);
+    expect(stats.absentToday).toBe(1);
+    expect(stats.onLeaveToday).toBe(1);
+
+    // (2 present + 1 late + 0.5 half-day) / 6 records = 58%
+    expect(stats.attendanceRate).toBe(58);
+    expect(stats.pendingLeaveRequests).toBe(2);
+  });
+
+  it("does not count weekends as working attendance", async () => {
+    const stats = await getDashboardStats("2026-08-15");
+
+    expect(stats.totalEmployees).toBe(10);
     expect(stats.presentToday).toBe(0);
     expect(stats.lateToday).toBe(0);
+    expect(stats.halfDayToday).toBe(0);
     expect(stats.absentToday).toBe(0);
+    expect(stats.onLeaveToday).toBe(0);
     expect(stats.attendanceRate).toBe(0);
+    expect(stats.pendingLeaveRequests).toBe(2);
   });
 
-  it("counts only employees active on the requested date", () => {
-    const stats = getDashboardStats("2026-06-01");
+  it("counts only employees active on the requested date", async () => {
+    employeeCount.mockResolvedValue(4);
 
-    const expectedActiveEmployees = employees.filter(
-      (employee) => {
-        if (employee.joiningDate > "2026-06-01") {
-          return false;
-        }
+    const stats = await getDashboardStats("2026-06-01");
 
-        if (
-          employee.resignationDate &&
-          employee.resignationDate < "2026-06-01"
-        ) {
-          return false;
-        }
-
-        return true;
+    expect(stats.totalEmployees).toBe(4);
+    expect(employeeCount).toHaveBeenCalledWith({
+      where: {
+        joinDate: {
+          lte: new Date("2026-06-01T23:59:59.999Z"),
+        },
+        OR: [
+          { resignationDate: null },
+          {
+            resignationDate: {
+              gte: new Date("2026-06-01T00:00:00.000Z"),
+            },
+          },
+        ],
       },
-    ).length;
-
-    expect(stats.totalEmployees).toBe(
-      expectedActiveEmployees,
-    );
+    });
   });
 });
