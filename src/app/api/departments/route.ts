@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 
+import { getApiUser, unauthorizedResponse } from "@/lib/api-auth";
 import { getDepartments } from "@/services/departmentService";
 
 export async function GET() {
   try {
+    // Require authentication.
+    const user = await getApiUser();
+
+    if (!user) {
+      return unauthorizedResponse();
+    }
+
     const departments = await getDepartments();
 
     return NextResponse.json({
