@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+
+import {
+  forbiddenResponse,
+  getApiUser,
+  unauthorizedResponse,
+} from "@/lib/api-auth";
 import {
   getDashboardStats,
   getLatestAttendanceDate,
@@ -6,6 +12,16 @@ import {
 
 export async function GET() {
   try {
+    const user = await getApiUser();
+
+    if (!user) {
+      return unauthorizedResponse();
+    }
+
+    if (user.role !== "ADMIN") {
+      return forbiddenResponse();
+    }
+
     const date = await getLatestAttendanceDate();
     const stats = await getDashboardStats(date);
 
