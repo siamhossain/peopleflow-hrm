@@ -452,10 +452,12 @@ export const rejectLeaveRequest = async (
 
 export const cancelLeaveRequest = async (
   requestId: string,
+  employeeId?: string,
 ): Promise<LeaveActionResult> => {
-  const request = await prisma.leaveRequest.findUnique({
+  const request = await prisma.leaveRequest.findFirst({
     where: {
       id: requestId,
+      ...(employeeId ? { employeeId } : {}),
     },
   });
 

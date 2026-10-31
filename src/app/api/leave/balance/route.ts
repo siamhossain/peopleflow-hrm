@@ -1,17 +1,41 @@
 import { NextResponse } from "next/server";
 
+import {
+  forbiddenResponse,
+  getApiUser,
+  unauthorizedResponse,
+} from "@/lib/api-auth";
 import { calculateLeaveBalance } from "@/services/leaveService";
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const employeeId = searchParams.get("employeeId");
+    const user = await getApiUser();
 
-    if (!employeeId) {
-      return NextResponse.json(
-        { message: "Employee ID is required." },
-        { status: 400 },
-      );
+    if (!user) {
+      return unauthorizedResponse();
+    }
+
+    const { searchParams } = new URL(request.url);
+    const requestedEmployeeId = searchParams.get("employeeId");
+
+    let employeeId: string;
+
+    if (user.role === "ADMIN") {
+      if (!requestedEmployeeId) {
+        return NextResponse.json(
+          { message: "Employee ID is required." },
+          { status: 400 },
+        );
+      }
+
+      employeeId = requestedEmployeeId;
+    } else {
+      if (!user.employeeId) {
+        return forbiddenResponse();
+      }
+
+      // Ignore any employeeId supplied by an employee.
+      employeeId = user.employeeId;
     }
 
     const balances = await calculateLeaveBalance(employeeId);

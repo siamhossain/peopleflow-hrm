@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   leaveRequestFindMany: vi.fn(),
   leaveRequestCreate: vi.fn(),
   leaveRequestFindUnique: vi.fn(),
+  leaveRequestFindFirst: vi.fn(),
   leaveRequestUpdate: vi.fn(),
 }));
 
@@ -23,6 +24,7 @@ vi.mock("@/lib/prisma", () => ({
       findMany: mocks.leaveRequestFindMany,
       create: mocks.leaveRequestCreate,
       findUnique: mocks.leaveRequestFindUnique,
+      findFirst: mocks.leaveRequestFindFirst,
       update: mocks.leaveRequestUpdate,
     },
   },
@@ -85,6 +87,7 @@ beforeEach(() => {
   vi.resetAllMocks();
 
   mocks.employeeFindUnique.mockResolvedValue(employee);
+
   mocks.leaveTypeFindUnique.mockImplementation(async ({ where }) => {
     if (where.id === annualLeave.id) return annualLeave;
     if (where.id === sickLeave.id) return sickLeave;
@@ -292,6 +295,7 @@ describe("Leave Service — Business Rules", () => {
       expect(result.success).toBe(true);
       expect(result.request?.status).toBe("pending");
       expect(result.request?.employeeId).toBe("emp-001");
+
       expect(mocks.leaveRequestCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -319,6 +323,7 @@ describe("Leave Service — Business Rules", () => {
       mocks.leaveRequestFindUnique.mockResolvedValue(
         request({ status: "PENDING", approvedAt: null, approvedBy: null }),
       );
+
       mocks.leaveRequestUpdate.mockResolvedValue(
         request({ status: "APPROVED", approvedBy: "reviewer-001" }),
       );
@@ -341,6 +346,7 @@ describe("Leave Service — Business Rules", () => {
       expect(result.message).toBe(
         "Only pending leave requests can be approved.",
       );
+
       expect(mocks.leaveRequestUpdate).not.toHaveBeenCalled();
     });
   });
@@ -350,6 +356,7 @@ describe("Leave Service — Business Rules", () => {
       mocks.leaveRequestFindUnique.mockResolvedValue(
         request({ status: "PENDING", approvedAt: null, approvedBy: null }),
       );
+
       mocks.leaveRequestUpdate.mockResolvedValue(
         request({ status: "REJECTED", approvedBy: "reviewer-001" }),
       );
@@ -371,15 +378,17 @@ describe("Leave Service — Business Rules", () => {
       expect(result.message).toBe(
         "Only pending leave requests can be rejected.",
       );
+
       expect(mocks.leaveRequestUpdate).not.toHaveBeenCalled();
     });
   });
 
   describe("cancelLeaveRequest", () => {
     it("cancels an approved request", async () => {
-      mocks.leaveRequestFindUnique.mockResolvedValue(
+      mocks.leaveRequestFindFirst.mockResolvedValue(
         request({ status: "APPROVED" }),
       );
+
       mocks.leaveRequestUpdate.mockResolvedValue(
         request({ status: "CANCELLED" }),
       );
@@ -391,7 +400,7 @@ describe("Leave Service — Business Rules", () => {
     });
 
     it("prevents cancelling a pending request", async () => {
-      mocks.leaveRequestFindUnique.mockResolvedValue(
+      mocks.leaveRequestFindFirst.mockResolvedValue(
         request({ status: "PENDING" }),
       );
 
@@ -401,6 +410,7 @@ describe("Leave Service — Business Rules", () => {
       expect(result.message).toBe(
         "Only approved leave requests can be cancelled.",
       );
+
       expect(mocks.leaveRequestUpdate).not.toHaveBeenCalled();
     });
   });
