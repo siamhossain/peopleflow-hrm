@@ -1,7 +1,9 @@
 import Link from "next/link";
 
-import { employees } from "@/data/employees";
-import { mockSessions } from "@/data/mockSession";
+import { redirect } from "next/navigation";
+
+import { prisma } from "@/lib/prisma";
+import { auth } from "../../../../auth";
 import {
   getAttendanceList,
   getPaginatedAttendanceList,
@@ -136,8 +138,30 @@ export default async function MyAttendancePage({
   const page =
     Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
-  const employeeId = mockSessions.employee.employeeId;
-  const employee = employees.find((item) => item.id === employeeId);
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  if (session.user.role !== "EMPLOYEE" || !session.user.employeeId) {
+    redirect("/dashboard");
+  }
+
+  const employeeId = session.user.employeeId;
+
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: {
+      firstName: true,
+      lastName: true,
+      employeeCode: true,
+    },
+  });
+
+  if (!employee) {
+    redirect("/login");
+  }
 
   const query = {
     employeeId,
