@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  forbiddenResponse,
+  getApiUser,
+  unauthorizedResponse,
+} from "@/lib/api-auth";
 import { queryEmployees, type EmployeeQuery } from "@/services/employeeService";
 import type { Employee } from "@/types/employee";
 
@@ -26,6 +31,18 @@ function parsePositiveInteger(value: string | null, fallback: number): number {
 
 export async function GET(request: NextRequest) {
   try {
+    // 1. Authenticate the request.
+    const user = await getApiUser();
+
+    if (!user) {
+      return unauthorizedResponse();
+    }
+
+    // 2. Only administrators can access the employee directory.
+    if (user.role !== "ADMIN") {
+      return forbiddenResponse();
+    }
+
     const params = request.nextUrl.searchParams;
 
     const rawStatus = params.get("status")?.toLowerCase();
@@ -41,6 +58,7 @@ export async function GET(request: NextRequest) {
     };
 
     const rawSortBy = params.get("sortBy");
+
     if (
       rawSortBy === "name" ||
       rawSortBy === "joiningDate" ||
@@ -50,6 +68,7 @@ export async function GET(request: NextRequest) {
     }
 
     const rawSortOrder = params.get("sortOrder");
+
     if (rawSortOrder === "asc" || rawSortOrder === "desc") {
       query.sortOrder = rawSortOrder;
     }
