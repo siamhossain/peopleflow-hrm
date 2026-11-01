@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import { navigationItems, type NavigationRole } from "./navigation";
 
 interface SidebarProps {
@@ -57,18 +58,6 @@ export function Sidebar({ role, mobile = false, onNavigate }: SidebarProps) {
             );
           })}
         </nav>
-
-        <div className="border-t p-4">
-          <div className="rounded-lg bg-gray-50 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Current Role
-            </p>
-
-            <p className="mt-1 text-sm font-semibold capitalize text-gray-900">
-              {role}
-            </p>
-          </div>
-        </div>
       </div>
     </aside>
   );
