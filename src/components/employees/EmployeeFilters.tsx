@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 
 import { EmployeeDetails } from "@/components/employees/EmployeeDetails";
 import { EmployeeForm } from "@/components/employees/EmployeeForm";
@@ -45,10 +46,16 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
     null,
   );
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [employeeToDeactivate, setEmployeeToDeactivate] =
+    useState<Employee | null>(null);
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+
   const [refreshKey, setRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -170,6 +177,47 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
   const handleEditEmployee = (employee: Employee) => {
     setSelectedEmployee(null);
     setEditingEmployee(employee);
+  };
+
+  const handleDeactivateEmployee = async () => {
+    if (!employeeToDeactivate || isDeactivating) {
+      return;
+    }
+
+    setIsDeactivating(true);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/employees/${employeeToDeactivate.id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const payload = (await response.json()) as {
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Failed to deactivate employee.");
+      }
+
+      const employeeName = `${employeeToDeactivate.firstName} ${employeeToDeactivate.lastName}`;
+
+      setEmployeeToDeactivate(null);
+      setSuccessMessage(`${employeeName} has been deactivated successfully.`);
+
+      setPage(1);
+      setRefreshKey((current) => current + 1);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to deactivate employee.",
+      );
+    } finally {
+      setIsDeactivating(false);
+    }
   };
 
   return (
@@ -319,11 +367,21 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
         </p>
       )}
 
+      {successMessage && (
+        <p
+          role="status"
+          className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+        >
+          {successMessage}
+        </p>
+      )}
+
       <div className="mt-6">
         <EmployeeTable
           employees={result.data}
           onView={setSelectedEmployee}
           onEdit={handleEditEmployee}
+          onDeactivate={setEmployeeToDeactivate}
         />
       </div>
 
@@ -380,6 +438,90 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
             setRefreshKey((current) => current + 1);
           }}
         />
+      )}
+
+      {/* Deactivation Confirmation Dialog */}
+      {employeeToDeactivate && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isDeactivating) {
+              setEmployeeToDeactivate(null);
+            }
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="deactivate-dialog-title"
+            aria-describedby="deactivate-dialog-description"
+            className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50">
+                  <AlertTriangle size={22} className="text-red-600" />
+                </div>
+
+                <h2
+                  id="deactivate-dialog-title"
+                  className="text-lg font-semibold text-gray-900"
+                >
+                  Deactivate Employee
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleDeactivateEmployee()}
+                disabled={isDeactivating}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Loader2
+                  size={16}
+                  className={isDeactivating ? "animate-spin" : "invisible"}
+                />
+
+                {isDeactivating ? "Deactivating..." : "Deactivate"}
+              </button>
+            </div>
+
+            <p
+              id="deactivate-dialog-description"
+              className="mt-4 text-sm leading-6 text-gray-600"
+            >
+              Are you sure you want to deactivate{" "}
+              <span className="font-semibold text-gray-900">
+                {employeeToDeactivate.firstName} {employeeToDeactivate.lastName}
+              </span>
+              ? This employee will no longer be active, but their existing
+              records and history will be preserved.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setEmployeeToDeactivate(null)}
+                disabled={isDeactivating}
+                className="rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleDeactivateEmployee()}
+                disabled={isDeactivating}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeactivating && (
+                  <Loader2 size={16} className="animate-spin" />
+                )}
+                {isDeactivating ? "Deactivating..." : "Deactivate"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

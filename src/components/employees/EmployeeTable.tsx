@@ -1,10 +1,11 @@
 import type { Employee } from "@/types/employee";
-import { Eye, Pencil } from "lucide-react";
+import { Eye, Pencil, UserX } from "lucide-react";
 
 interface EmployeeTableProps {
   employees: Employee[];
   onView: (employee: Employee) => void;
   onEdit: (employee: Employee) => void;
+  onDeactivate: (employee: Employee) => void;
 }
 
 const statusStyles: Record<Employee["status"], string> = {
@@ -33,6 +34,7 @@ export function EmployeeTable({
   employees,
   onView,
   onEdit,
+  onDeactivate,
 }: EmployeeTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
@@ -110,6 +112,7 @@ export function EmployeeTable({
 
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-center gap-2">
+                      {/* View */}
                       <button
                         type="button"
                         onClick={() => onView(employee)}
@@ -120,6 +123,7 @@ export function EmployeeTable({
                         <Eye size={18} />
                       </button>
 
+                      {/* Edit */}
                       <button
                         type="button"
                         onClick={() => onEdit(employee)}
@@ -129,6 +133,20 @@ export function EmployeeTable({
                       >
                         <Pencil size={18} />
                       </button>
+
+                      {/* Deactivate */}
+                      {(employee.status === "active" ||
+                        employee.status === "on_leave") && (
+                        <button
+                          type="button"
+                          onClick={() => onDeactivate(employee)}
+                          title="Deactivate employee"
+                          aria-label={`Deactivate ${employee.firstName} ${employee.lastName}`}
+                          className="rounded-md p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600"
+                        >
+                          <UserX size={18} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
