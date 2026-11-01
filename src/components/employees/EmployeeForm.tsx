@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 
-import type { Department } from "@/types/employee";
+import type { Department, Employee } from "@/types/employee";
+
+type EditableEmployee = Employee & {
+  phone?: string | null;
+};
 
 interface EmployeeFormProps {
   departments: Department[];
+  employee?: EditableEmployee;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -22,7 +27,7 @@ interface EmployeeFormData {
   joiningDate: string;
 }
 
-const INITIAL_FORM: EmployeeFormData = {
+const EMPTY_FORM: EmployeeFormData = {
   employeeCode: "",
   firstName: "",
   lastName: "",
@@ -33,18 +38,40 @@ const INITIAL_FORM: EmployeeFormData = {
   joiningDate: "",
 };
 
+function getInitialForm(employee?: EditableEmployee): EmployeeFormData {
+  if (!employee) {
+    return EMPTY_FORM;
+  }
+
+  return {
+    employeeCode: employee.employeeCode,
+    firstName: employee.firstName,
+    lastName: employee.lastName,
+    email: employee.email,
+    phone: employee.phone ?? "",
+    departmentId: employee.departmentId,
+    designation: employee.designation,
+    joiningDate: employee.joiningDate.slice(0, 10),
+  };
+}
+
 export function EmployeeForm({
   departments,
+  employee,
   onClose,
   onSuccess,
 }: EmployeeFormProps) {
-  const [formData, setFormData] = useState<EmployeeFormData>(INITIAL_FORM);
+  const isEditing = Boolean(employee);
+
+  const [formData, setFormData] = useState<EmployeeFormData>(() =>
+    getInitialForm(employee),
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const handleChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = event.target;
 
@@ -61,16 +88,23 @@ export function EmployeeForm({
     setError("");
 
     try {
-      const response = await fetch("/api/employees", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      if (isEditing && !employee) {
+        throw new Error("Employee information is missing.");
+      }
+
+      const response = await fetch(
+        employee ? `/api/employees/${employee.id}` : "/api/employees",
+        {
+          method: isEditing ? "PATCH" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...formData,
+            phone: formData.phone.trim() || undefined,
+          }),
         },
-        body: JSON.stringify({
-          ...formData,
-          phone: formData.phone.trim() || undefined,
-        }),
-      });
+      );
 
       const payload = (await response.json()) as {
         data?: unknown;
@@ -78,7 +112,10 @@ export function EmployeeForm({
       };
 
       if (!response.ok) {
-        throw new Error(payload.message ?? "Failed to create employee.");
+        throw new Error(
+          payload.message ??
+            `Failed to ${isEditing ? "update" : "create"} employee.`,
+        );
       }
 
       onSuccess();
@@ -119,11 +156,13 @@ export function EmployeeForm({
               id="employee-form-title"
               className="text-lg font-semibold text-gray-900"
             >
-              Add New Employee
+              {isEditing ? "Edit Employee" : "Add New Employee"}
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">
-              Enter the employee&apos;s information below.
+              {isEditing
+                ? "Update the employee's information below."
+                : "Enter the employee's information below."}
             </p>
           </div>
 
@@ -305,7 +344,13 @@ export function EmployeeForm({
               disabled={isSubmitting || departments.length === 0}
               className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isSubmitting ? "Creating..." : "Create Employee"}
+              {isSubmitting
+                ? isEditing
+                  ? "Saving..."
+                  : "Creating..."
+                : isEditing
+                  ? "Save Changes"
+                  : "Create Employee"}
             </button>
           </div>
         </form>

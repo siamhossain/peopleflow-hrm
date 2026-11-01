@@ -6,6 +6,7 @@ import { departments } from "@/data/departments";
 interface EmployeeDetailsProps {
   employee: Employee;
   onClose: () => void;
+  onEdit: (employee: Employee) => void;
 }
 
 const statusStyles: Record<Employee["status"], string> = {
@@ -34,7 +35,11 @@ const formatDate = (date?: string) => {
   }).format(new Date(`${date}T00:00:00`));
 };
 
-export function EmployeeDetails({ employee, onClose }: EmployeeDetailsProps) {
+export function EmployeeDetails({
+  employee,
+  onClose,
+  onEdit,
+}: EmployeeDetailsProps) {
   const department = departments.find(
     (item) => item.id === employee.departmentId,
   );
@@ -151,7 +156,15 @@ export function EmployeeDetails({ employee, onClose }: EmployeeDetailsProps) {
           </div>
         </div>
 
-        <div className="flex justify-end border-t px-6 py-4">
+        <div className="flex justify-between border-t px-6 py-4">
+          <button
+            type="button"
+            onClick={() => onEdit(employee)}
+            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            Edit Employee
+          </button>
+
           <button
             type="button"
             onClick={onClose}

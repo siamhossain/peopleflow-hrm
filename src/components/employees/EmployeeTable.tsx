@@ -1,8 +1,10 @@
 import type { Employee } from "@/types/employee";
+import { Eye, Pencil } from "lucide-react";
 
 interface EmployeeTableProps {
   employees: Employee[];
   onView: (employee: Employee) => void;
+  onEdit: (employee: Employee) => void;
 }
 
 const statusStyles: Record<Employee["status"], string> = {
@@ -27,7 +29,11 @@ const formatDate = (date: string) => {
   }).format(new Date(`${date}T00:00:00`));
 };
 
-export function EmployeeTable({ employees, onView }: EmployeeTableProps) {
+export function EmployeeTable({
+  employees,
+  onView,
+  onEdit,
+}: EmployeeTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
       <div className="overflow-x-auto">
@@ -35,26 +41,20 @@ export function EmployeeTable({ employees, onView }: EmployeeTableProps) {
           <thead className="border-b bg-gray-50">
             <tr>
               <th className="px-5 py-3 font-medium text-gray-600">Employee</th>
-
               <th className="px-5 py-3 font-medium text-gray-600">
                 Employee Code
               </th>
-
               <th className="px-5 py-3 font-medium text-gray-600">
                 Designation
               </th>
-
               <th className="px-5 py-3 font-medium text-gray-600">
                 Department
               </th>
-
               <th className="px-5 py-3 font-medium text-gray-600">
                 Joining Date
               </th>
-
               <th className="px-5 py-3 font-medium text-gray-600">Status</th>
-
-              <th className="px-5 py-3 font-medium text-gray-600">Action</th>
+              <th className="px-5 py-3 font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
 
@@ -65,7 +65,6 @@ export function EmployeeTable({ employees, onView }: EmployeeTableProps) {
                   <p className="text-sm font-medium text-gray-900">
                     No employees found
                   </p>
-
                   <p className="mt-1 text-sm text-gray-500">
                     Try adjusting your search or filters.
                   </p>
@@ -79,7 +78,6 @@ export function EmployeeTable({ employees, onView }: EmployeeTableProps) {
                       <p className="font-medium text-gray-900">
                         {employee.firstName} {employee.lastName}
                       </p>
-
                       <p className="text-xs text-gray-500">{employee.email}</p>
                     </div>
                   </td>
@@ -111,13 +109,27 @@ export function EmployeeTable({ employees, onView }: EmployeeTableProps) {
                   </td>
 
                   <td className="px-5 py-4">
-                    <button
-                      type="button"
-                      onClick={() => onView(employee)}
-                      className="text-sm font-medium text-gray-600 hover:text-gray-900"
-                    >
-                      View
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onView(employee)}
+                        title="View employee"
+                        aria-label={`View ${employee.firstName} ${employee.lastName}`}
+                        className="rounded-md p-2 text-gray-500 transition hover:bg-blue-50 hover:text-blue-600"
+                      >
+                        <Eye size={18} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onEdit(employee)}
+                        title="Edit employee"
+                        aria-label={`Edit ${employee.firstName} ${employee.lastName}`}
+                        className="rounded-md p-2 text-gray-500 transition hover:bg-amber-50 hover:text-amber-600"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

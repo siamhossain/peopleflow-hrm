@@ -44,6 +44,7 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null,
   );
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -166,10 +167,9 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
     setPage(1);
   };
 
-  const handleEmployeeCreated = () => {
-    setIsCreateModalOpen(false);
-    setPage(1);
-    setRefreshKey((current) => current + 1);
+  const handleEditEmployee = (employee: Employee) => {
+    setSelectedEmployee(null);
+    setEditingEmployee(employee);
   };
 
   return (
@@ -320,7 +320,11 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
       )}
 
       <div className="mt-6">
-        <EmployeeTable employees={result.data} onView={setSelectedEmployee} />
+        <EmployeeTable
+          employees={result.data}
+          onView={setSelectedEmployee}
+          onEdit={handleEditEmployee}
+        />
       </div>
 
       {result.totalPages > 1 && (
@@ -357,14 +361,24 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
         <EmployeeDetails
           employee={selectedEmployee}
           onClose={() => setSelectedEmployee(null)}
+          onEdit={handleEditEmployee}
         />
       )}
 
-      {isCreateModalOpen && (
+      {(isCreateModalOpen || editingEmployee) && (
         <EmployeeForm
           departments={departments}
-          onClose={() => setIsCreateModalOpen(false)}
-          onSuccess={handleEmployeeCreated}
+          employee={editingEmployee ?? undefined}
+          onClose={() => {
+            setIsCreateModalOpen(false);
+            setEditingEmployee(null);
+          }}
+          onSuccess={() => {
+            setIsCreateModalOpen(false);
+            setEditingEmployee(null);
+            setPage(1);
+            setRefreshKey((current) => current + 1);
+          }}
         />
       )}
     </>
