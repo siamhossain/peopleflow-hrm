@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 
 import { EmployeeDetails } from "@/components/employees/EmployeeDetails";
+import { EmployeeForm } from "@/components/employees/EmployeeForm";
 import { EmployeeTable } from "@/components/employees/EmployeeTable";
-import type { Employee, Department } from "@/types/employee";
 
+import type { Employee, Department } from "@/types/employee";
 import type { PaginatedEmployees } from "@/services/employeeService";
 
 interface EmployeeFiltersProps {
@@ -43,6 +44,8 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null,
   );
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -96,7 +99,7 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
     void fetchEmployees();
 
     return () => controller.abort();
-  }, [search, departmentId, status, sortBy, sortOrder, page]);
+  }, [search, departmentId, status, sortBy, sortOrder, page, refreshKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -163,8 +166,27 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
     setPage(1);
   };
 
+  const handleEmployeeCreated = () => {
+    setIsCreateModalOpen(false);
+    setPage(1);
+    setRefreshKey((current) => current + 1);
+  };
+
   return (
     <>
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setIsCreateModalOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+        >
+          <span aria-hidden="true" className="text-lg leading-none">
+            +
+          </span>
+          Add Employee
+        </button>
+      </div>
+
       <div className="rounded-xl border bg-white p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div className="xl:col-span-2">
@@ -335,6 +357,14 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
         <EmployeeDetails
           employee={selectedEmployee}
           onClose={() => setSelectedEmployee(null)}
+        />
+      )}
+
+      {isCreateModalOpen && (
+        <EmployeeForm
+          departments={departments}
+          onClose={() => setIsCreateModalOpen(false)}
+          onSuccess={handleEmployeeCreated}
         />
       )}
     </>
