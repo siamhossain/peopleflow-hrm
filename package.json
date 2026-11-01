@@ -8,12 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-  "create:employee": "tsx scripts/create-employee.ts"
+    "create:employee": "tsx scripts/create-employee.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "bcryptjs": "^3.0.3",
+    "lucide-react": "^1.66.0",
     "next": "16.3.1",
     "next-auth": "^5.0.0-beta.32",
     "pg": "^8.23.1",

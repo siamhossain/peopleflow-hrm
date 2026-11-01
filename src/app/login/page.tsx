@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -30,24 +30,35 @@ export default function LoginPage() {
         return;
       }
 
-      router.replace("/dashboard");
+      const session = await getSession();
+
+      if (!session?.user) {
+        setError("Unable to retrieve your session. Please try again.");
+        return;
+      }
+
+      if (session.user.role === "EMPLOYEE") {
+        router.replace("/employee/attendance");
+      } else {
+        router.replace("/dashboard");
+      }
+
       router.refresh();
-    } catch {
-      setError("Unable to sign in. Please try again.");
+    } catch (error) {
+      console.error("Login failed:", error);
+      setError("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            PeopleFlow HRM
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">WorkBridge HRM</h1>
 
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-gray-500">
             Sign in to access your account
           </p>
         </div>
@@ -56,53 +67,50 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="email"
-              className="mb-2 block text-sm font-medium text-slate-700"
+              className="mb-2 block text-sm font-medium text-gray-700"
             >
               Email address
             </label>
 
             <input
               id="email"
-              name="email"
               type="email"
-              autoComplete="username"
-              required
-              autoFocus
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@company.com"
-              className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              placeholder="Enter your email"
+              autoComplete="email"
+              required
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
           <div>
             <label
               htmlFor="password"
-              className="mb-2 block text-sm font-medium text-slate-700"
+              className="mb-2 block text-sm font-medium text-gray-700"
             >
               Password
             </label>
 
             <input
               id="password"
-              name="password"
               type="password"
-              autoComplete="current-password"
-              required
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Enter your password"
-              className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              autoComplete="current-password"
+              required
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
           {error && (
-            <p
+            <div
               role="alert"
-              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+              className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600"
             >
               {error}
-            </p>
+            </div>
           )}
 
           <button
@@ -113,10 +121,6 @@ export default function LoginPage() {
             {isLoading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-
-        <p className="mt-6 text-center text-xs text-slate-500">
-          Access is restricted to authorized HRM users.
-        </p>
       </div>
     </main>
   );
