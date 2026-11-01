@@ -6,10 +6,24 @@ import { Sidebar } from "./Sidebar";
 
 interface HeaderProps {
   role: NavigationRole;
+  user: {
+    name?: string | null;
+    email?: string | null;
+  };
 }
 
-export function Header({ role }: HeaderProps) {
+export function Header({ role, user }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const displayName =
+    user.name || (role === "admin" ? "HR Administrator" : "Employee");
+
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
 
   return (
     <>
@@ -36,14 +50,14 @@ export function Header({ role }: HeaderProps) {
           <div className="flex items-center gap-3">
             <div className="hidden text-right sm:block">
               <p className="text-sm font-semibold text-gray-900">
-                {role === "admin" ? "HR Administrator" : "Employee"}
+                {displayName}
               </p>
 
-              <p className="text-xs capitalize text-gray-500">{role}</p>
+              <p className="text-xs text-gray-500">{user.email || role}</p>
             </div>
 
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-700">
-              {role === "admin" ? "HR" : "EM"}
+              {initials || (role === "admin" ? "HR" : "EM")}
             </div>
           </div>
         </div>

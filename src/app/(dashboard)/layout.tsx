@@ -21,5 +21,15 @@ export default async function DashboardLayout({
     redirect("/employee/attendance");
   }
 
-  return <AppShell role="admin">{children}</AppShell>;
+  return (
+    <AppShell
+      role="admin"
+      user={{
+        name: session.user.name,
+        email: session.user.email,
+      }}
+    >
+      {children}
+    </AppShell>
+  );
 }
