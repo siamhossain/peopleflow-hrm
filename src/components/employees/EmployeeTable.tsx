@@ -1,8 +1,9 @@
-import type { Employee } from "@/types/employee";
+import type { Department, Employee } from "@/types/employee";
 import { Eye, Pencil, UserX } from "lucide-react";
 
 interface EmployeeTableProps {
   employees: Employee[];
+  departments: Department[];
   onView: (employee: Employee) => void;
   onEdit: (employee: Employee) => void;
   onDeactivate: (employee: Employee) => void;
@@ -32,6 +33,7 @@ const formatDate = (date: string) => {
 
 export function EmployeeTable({
   employees,
+  departments,
   onView,
   onEdit,
   onDeactivate,
@@ -93,7 +95,9 @@ export function EmployeeTable({
                   </td>
 
                   <td className="px-5 py-4 text-gray-600">
-                    {employee.departmentId}
+                    {departments.find(
+                      (department) => department.id === employee.departmentId,
+                    )?.name ?? "—"}
                   </td>
 
                   <td className="px-5 py-4 whitespace-nowrap text-gray-600">

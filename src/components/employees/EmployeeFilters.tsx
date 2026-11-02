@@ -379,6 +379,7 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
       <div className="mt-6">
         <EmployeeTable
           employees={result.data}
+          departments={departments}
           onView={setSelectedEmployee}
           onEdit={handleEditEmployee}
           onDeactivate={setEmployeeToDeactivate}
@@ -418,6 +419,7 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
       {selectedEmployee && (
         <EmployeeDetails
           employee={selectedEmployee}
+          departments={departments}
           onClose={() => setSelectedEmployee(null)}
           onEdit={handleEditEmployee}
         />

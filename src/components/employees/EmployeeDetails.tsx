@@ -1,10 +1,10 @@
 "use client";
 
-import type { Employee } from "@/types/employee";
-import { departments } from "@/data/departments";
+import type { Department, Employee } from "@/types/employee";
 
 interface EmployeeDetailsProps {
   employee: Employee;
+  departments: Department[];
   onClose: () => void;
   onEdit: (employee: Employee) => void;
 }
@@ -37,6 +37,7 @@ const formatDate = (date?: string) => {
 
 export function EmployeeDetails({
   employee,
+  departments,
   onClose,
   onEdit,
 }: EmployeeDetailsProps) {
