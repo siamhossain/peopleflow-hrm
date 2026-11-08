@@ -30,10 +30,8 @@ export async function GET(request: Request) {
     const getAll = searchParams.get("all") === "true";
     const requestedEmployeeId = searchParams.get("employeeId");
 
-    const canViewAllRequests =
-      user.role === "ADMIN" || user.role === "DEMO_VIEWER";
-
-    if (canViewAllRequests) {
+    // Admin can view all requests or requests for a selected employee.
+    if (user.role === "ADMIN") {
       if (getAll) {
         const requests = await getLeaveRequests();
         return NextResponse.json({ data: requests });
@@ -47,18 +45,34 @@ export async function GET(request: Request) {
       }
 
       const requests = await getEmployeeLeaveRequests(requestedEmployeeId);
+      return NextResponse.json({ data: requests });
+    }
+
+    // Demo Viewer can view all requests in read-only reports,
+    // or only Alex Morgan's requests in the My Leave page.
+    if (user.role === "DEMO_VIEWER") {
+      if (!user.employeeId) {
+        return forbiddenResponse();
+      }
+
+      const requests = getAll
+        ? await getLeaveRequests()
+        : await getEmployeeLeaveRequests(user.employeeId);
 
       return NextResponse.json({ data: requests });
     }
 
-    if (!user.employeeId) {
-      return forbiddenResponse();
+    // Employees can only retrieve their own requests.
+    if (user.role === "EMPLOYEE") {
+      if (!user.employeeId) {
+        return forbiddenResponse();
+      }
+
+      const requests = await getEmployeeLeaveRequests(user.employeeId);
+      return NextResponse.json({ data: requests });
     }
 
-    // Employees can only retrieve their own requests.
-    const requests = await getEmployeeLeaveRequests(user.employeeId);
-
-    return NextResponse.json({ data: requests });
+    return forbiddenResponse();
   } catch (error) {
     console.error("Failed to fetch leave requests:", error);
 

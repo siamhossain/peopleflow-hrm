@@ -132,8 +132,7 @@ export default async function MyAttendancePage({
   const params = await searchParams;
 
   // No month filter is applied by default.
-  const selectedMonth = isValidMonth(params.month) ? params.month : undefined;
-
+  const selectedMonth = isValidMonth(params.month) ? params.month : "2026-08";
   const requestedPage = Number(params.page ?? "1");
   const page =
     Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
@@ -309,41 +308,35 @@ export default async function MyAttendancePage({
           </div>
 
           {/* Filter is inside the attendance history card */}
-          <form
-            action="/employee/attendance"
-            method="GET"
-            className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
-          >
-            <div className="flex-1 space-y-1">
-              <label
-                htmlFor="attendance-month"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Filter by month
-              </label>
+          <form method="GET" className="mb-4 flex flex-wrap items-center gap-3">
+            <label
+              htmlFor="month"
+              className="text-sm font-medium text-gray-700"
+            >
+              Filter by month
+            </label>
 
-              <select
-                id="attendance-month"
-                name="month"
-                defaultValue={selectedMonth ?? ""}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="">All Months</option>
-
-                {getMonthOptions().map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <input
+              id="month"
+              name="month"
+              type="month"
+              defaultValue={selectedMonth ?? ""}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
+            />
 
             <button
               type="submit"
-              className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
             >
-              Apply Filter
+              Apply
             </button>
+
+            <a
+              href="/employee/attendance"
+              className="text-sm font-medium text-gray-600 underline hover:text-gray-900"
+            >
+              Clear
+            </a>
           </form>
         </div>
 
