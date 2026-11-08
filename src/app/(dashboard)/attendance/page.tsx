@@ -7,10 +7,10 @@ import { departments } from "@/data/departments";
 import type {
   AttendanceListItem,
   PaginatedAttendance,
-} from "@/services/attendanceService";
+} from "@/types/attendance";
 
-const DEFAULT_MONTH = "2026-08";
 const PAGE_SIZE = 25;
+const DEFAULT_MONTH = "2026-08";
 
 const EMPTY_RESULT: PaginatedAttendance = {
   data: [],
@@ -20,10 +20,7 @@ const EMPTY_RESULT: PaginatedAttendance = {
   totalPages: 1,
 };
 
-const statusOptions: {
-  value: AttendanceListItem["status"] | "all";
-  label: string;
-}[] = [
+const statusOptions = [
   { value: "all", label: "All Statuses" },
   { value: "present", label: "Present" },
   { value: "late", label: "Late" },
@@ -32,19 +29,34 @@ const statusOptions: {
   { value: "leave", label: "Leave" },
 ];
 
+interface AttendanceApiResponse {
+  data?: PaginatedAttendance;
+  error?: string;
+}
+
 const getMonthDateRange = (month: string) => {
   const [year, monthNumber] = month.split("-").map(Number);
 
-  const startDate = `${year}-${String(monthNumber).padStart(2, "0")}-01`;
-  const lastDay = new Date(year, monthNumber, 0).getDate();
-  const endDate = `${year}-${String(monthNumber).padStart(2, "0")}-${String(
-    lastDay,
-  ).padStart(2, "0")}`;
+  const startDate = new Date(year, monthNumber - 1, 1);
+  const endDate = new Date(year, monthNumber, 0);
 
-  return { startDate, endDate };
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  return {
+    startDate: formatDate(startDate),
+    endDate: formatDate(endDate),
+  };
 };
 
 const formatMonth = (month: string) => {
+  if (!month) return "All Months";
+
   const [year, monthNumber] = month.split("-").map(Number);
 
   return new Intl.DateTimeFormat("en-US", {
@@ -53,39 +65,37 @@ const formatMonth = (month: string) => {
   }).format(new Date(year, monthNumber - 1, 1));
 };
 
-interface AttendanceApiResponse {
-  data?: PaginatedAttendance;
-  error?: string;
-}
-
 export default function AttendancePage() {
   const [selectedMonth, setSelectedMonth] = useState(DEFAULT_MONTH);
-  const [selectedStatus, setSelectedStatus] = useState<
-    AttendanceListItem["status"] | "all"
-  >("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [page, setPage] = useState(1);
 
+  const [page, setPage] = useState(1);
   const [result, setResult] = useState<PaginatedAttendance>(EMPTY_RESULT);
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
 
-    async function fetchAttendance() {
+    const fetchAttendance = async () => {
       setIsLoading(true);
       setError("");
 
       try {
-        const { startDate, endDate } = getMonthDateRange(selectedMonth);
-
         const params = new URLSearchParams({
-          startDate,
-          endDate,
           page: String(page),
           pageSize: String(PAGE_SIZE),
         });
+
+        // Apply date filtering only when the user selects a month.
+        if (selectedMonth) {
+          const { startDate, endDate } = getMonthDateRange(selectedMonth);
+
+          params.set("startDate", startDate);
+          params.set("endDate", endDate);
+        }
 
         if (selectedDepartment) {
           params.set("departmentId", selectedDepartment);
@@ -96,22 +106,27 @@ export default function AttendancePage() {
         }
 
         const response = await fetch(`/api/attendance?${params.toString()}`, {
+          method: "GET",
           signal: controller.signal,
         });
 
         const payload = (await response.json()) as AttendanceApiResponse;
 
-        if (!response.ok || !payload.data) {
+        if (!response.ok) {
           throw new Error(
-            payload.error ?? "Failed to load attendance records.",
+            payload.error || "Failed to fetch attendance records.",
           );
+        }
+
+        if (!payload.data) {
+          throw new Error("Invalid attendance response.");
         }
 
         setResult(payload.data);
 
-        // Keep the UI aligned with the actual page returned by the API.
-        if (payload.data.page !== page) {
-          setPage(payload.data.page);
+        // Keep the current page valid if filtering reduces total pages.
+        if (page > payload.data.totalPages) {
+          setPage(Math.max(1, payload.data.totalPages));
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
@@ -119,50 +134,112 @@ export default function AttendancePage() {
         }
 
         setResult(EMPTY_RESULT);
+
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to load attendance records.",
+            : "Something went wrong while fetching attendance.",
         );
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);
         }
       }
-    }
+    };
 
     void fetchAttendance();
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+    };
   }, [selectedMonth, selectedStatus, selectedDepartment, page]);
 
   const firstRecord =
-    result.total === 0 ? 0 : (result.page - 1) * result.pageSize + 1;
+    result.total === 0 ? 0 : (result.page - 1) * PAGE_SIZE + 1;
 
-  const lastRecord = Math.min(result.page * result.pageSize, result.total);
+  const lastRecord = Math.min(result.page * PAGE_SIZE, result.total);
 
   const clearFilters = () => {
+    setSelectedMonth("");
     setSelectedStatus("all");
     setSelectedDepartment("");
     setPage(1);
   };
 
+  const getPageNumbers = () => {
+    const totalPages = result.totalPages;
+    const currentPage = result.page;
+
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    if (currentPage <= 3) {
+      return [1, 2, 3, 4, "...", totalPages];
+    }
+
+    if (currentPage >= totalPages - 2) {
+      return [
+        1,
+        "...",
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
+    }
+
+    return [
+      1,
+      "...",
+      currentPage - 1,
+      currentPage,
+      currentPage + 1,
+      "...",
+      totalPages,
+    ];
+  };
+
+  const goToPage = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > result.totalPages || nextPage === page) {
+      return;
+    }
+
+    setPage(nextPage);
+  };
+
   return (
-    <section>
+    <div className="space-y-6">
       <div>
-        <p className="text-sm font-medium text-gray-500">
-          Attendance Management
-        </p>
+        <h1 className="text-2xl font-semibold text-gray-900">Attendance</h1>
 
-        <h1 className="mt-1 text-2xl font-bold text-gray-900">Attendance</h1>
-
-        <p className="mt-2 text-sm text-gray-600">
-          Review employee attendance records by month, department, and status.
+        <p className="mt-1 text-sm text-gray-500">
+          View and manage employee attendance records.
         </p>
       </div>
 
-      <div className="mt-6 rounded-xl border bg-white p-4 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-3">
+      {/* Filters */}
+      <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-gray-900">Filters</h2>
+
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={
+              isLoading ||
+              (!selectedMonth &&
+                selectedStatus === "all" &&
+                !selectedDepartment)
+            }
+            className="text-sm font-medium text-gray-600 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Clear filters
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {/* Original month picker */}
           <div>
             <label
               htmlFor="attendance-month"
@@ -183,6 +260,7 @@ export default function AttendancePage() {
             />
           </div>
 
+          {/* Department filter */}
           <div>
             <label
               htmlFor="attendance-department"
@@ -210,6 +288,7 @@ export default function AttendancePage() {
             </select>
           </div>
 
+          {/* Status filter */}
           <div>
             <label
               htmlFor="attendance-status"
@@ -222,16 +301,14 @@ export default function AttendancePage() {
               id="attendance-status"
               value={selectedStatus}
               onChange={(event) => {
-                setSelectedStatus(
-                  event.target.value as AttendanceListItem["status"] | "all",
-                );
+                setSelectedStatus(event.target.value);
                 setPage(1);
               }}
               className="w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
             >
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              {statusOptions.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
                 </option>
               ))}
             </select>
@@ -239,152 +316,107 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-gray-600">
-          Showing{" "}
-          <span className="font-semibold text-gray-900">
-            {isLoading
-              ? "…"
-              : `${firstRecord}–${lastRecord} of ${result.total}`}
-          </span>{" "}
-          records for{" "}
-          <span className="font-semibold text-gray-900">
-            {formatMonth(selectedMonth)}
-          </span>
-        </p>
+      {/* Attendance records */}
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4">
+          <div>
+            <h2 className="font-semibold text-gray-900">Attendance Records</h2>
 
-        <button
-          type="button"
-          onClick={clearFilters}
-          disabled={
-            isLoading || (selectedStatus === "all" && !selectedDepartment)
-          }
-          className="text-left text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-40 sm:text-right"
-        >
-          Clear filters
-        </button>
-      </div>
-
-      <div className="mt-4">
-        {isLoading ? (
-          <div className="rounded-xl border bg-white px-6 py-12 text-center shadow-sm">
-            <p className="text-sm text-gray-500">Loading attendance records…</p>
-          </div>
-        ) : error ? (
-          <div className="rounded-xl border border-red-200 bg-white px-6 py-8 text-center shadow-sm">
-            <p className="font-medium text-red-700">
-              Could not load attendance records
+            <p className="mt-1 text-sm text-gray-500">
+              {formatMonth(selectedMonth)}
             </p>
-            <p className="mt-1 text-sm text-gray-600">{error}</p>
           </div>
-        ) : result.data.length > 0 ? (
-          <AttendanceTable records={result.data} />
-        ) : (
-          <div className="rounded-xl border bg-white px-6 py-12 text-center shadow-sm">
+
+          <p className="text-sm text-gray-500">
+            {isLoading ? "Loading records..." : `${result.total} total records`}
+          </p>
+        </div>
+
+        {error ? (
+          <div className="p-8 text-center">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        ) : isLoading ? (
+          <div className="p-8 text-center">
+            <p className="text-sm text-gray-500">
+              Loading attendance records...
+            </p>
+          </div>
+        ) : result.data.length === 0 ? (
+          <div className="p-8 text-center">
             <p className="font-medium text-gray-900">
               No attendance records found
             </p>
 
             <p className="mt-1 text-sm text-gray-500">
-              Try selecting another month or changing the filters.
+              Try changing or clearing your filters.
             </p>
           </div>
-        )}
-      </div>
+        ) : (
+          <>
+            <AttendanceTable records={result.data as AttendanceListItem[]} />
 
-      {!isLoading && !error && result.totalPages > 1 && (
-        <div className="mt-4 flex flex-col gap-3 rounded-xl border bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-gray-500">
-            Page {result.page} of {result.totalPages}
-            <span className="ml-2 text-gray-400">({result.total} records)</span>
-          </p>
+            {/* Pagination */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 px-5 py-4">
+              <p className="text-sm text-gray-500">
+                Showing{" "}
+                <span className="font-medium text-gray-900">{firstRecord}</span>{" "}
+                to{" "}
+                <span className="font-medium text-gray-900">{lastRecord}</span>{" "}
+                of{" "}
+                <span className="font-medium text-gray-900">
+                  {result.total}
+                </span>{" "}
+                records
+              </p>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-              disabled={result.page === 1}
-              className="rounded-lg border px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Previous
-            </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page <= 1}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
 
-            {(() => {
-              const currentPage = result.page;
-              const totalPages = result.totalPages;
-
-              let pages: (number | "ellipsis")[];
-
-              if (totalPages <= 5) {
-                pages = Array.from(
-                  { length: totalPages },
-                  (_, index) => index + 1,
-                );
-              } else if (currentPage <= 3) {
-                pages = [1, 2, 3, 4, "ellipsis", totalPages];
-              } else if (currentPage >= totalPages - 2) {
-                pages = [
-                  1,
-                  "ellipsis",
-                  totalPages - 3,
-                  totalPages - 2,
-                  totalPages - 1,
-                  totalPages,
-                ];
-              } else {
-                pages = [
-                  1,
-                  "ellipsis",
-                  currentPage - 1,
-                  currentPage,
-                  currentPage + 1,
-                  "ellipsis",
-                  totalPages,
-                ];
-              }
-
-              return pages.map((item, index) =>
-                item === "ellipsis" ? (
-                  <span
-                    key={`ellipsis-${index}`}
-                    className="px-1.5 text-sm text-gray-400"
-                    aria-hidden="true"
-                  >
-                    …
-                  </span>
-                ) : (
+                {getPageNumbers().map((pageNumber, index) => (
                   <button
-                    key={item}
+                    key={`${pageNumber}-${index}`}
                     type="button"
-                    onClick={() => setPage(item)}
-                    disabled={isLoading || item === currentPage}
-                    aria-current={item === currentPage ? "page" : undefined}
-                    aria-label={`Go to page ${item}`}
-                    className={`min-w-9 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:cursor-default ${
-                      item === currentPage
+                    disabled={pageNumber === "..."}
+                    onClick={() => {
+                      if (typeof pageNumber === "number") {
+                        goToPage(pageNumber);
+                      }
+                    }}
+                    className={`min-w-9 rounded-lg border px-3 py-2 text-sm ${
+                      pageNumber === page
                         ? "border-gray-900 bg-gray-900 text-white"
-                        : "text-gray-700 hover:bg-gray-50"
+                        : "border-gray-200 text-gray-700 hover:bg-gray-50"
+                    } ${
+                      pageNumber === "..."
+                        ? "cursor-default border-transparent"
+                        : ""
                     }`}
                   >
-                    {item}
+                    {pageNumber}
                   </button>
-                ),
-              );
-            })()}
+                ))}
 
-            <button
-              type="button"
-              onClick={() =>
-                setPage((current) => Math.min(result.totalPages, current + 1))
-              }
-              disabled={result.page === result.totalPages}
-              className="rounded-lg border px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
-    </section>
+                <button
+                  type="button"
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page >= result.totalPages}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

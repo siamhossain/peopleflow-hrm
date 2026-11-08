@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
+  demoReadOnlyResponse,
   forbiddenResponse,
   getApiUser,
   unauthorizedResponse,
@@ -49,6 +50,13 @@ async function authorizeAdmin() {
 
   if (!user) {
     return { error: unauthorizedResponse() };
+  }
+
+  // Explicitly block demo access before checking admin permissions.
+  const readOnlyResponse = demoReadOnlyResponse(user);
+
+  if (readOnlyResponse) {
+    return { error: readOnlyResponse };
   }
 
   if (user.role !== "ADMIN") {

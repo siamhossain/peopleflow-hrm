@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { loginAsDemo } from "@/app/actions/demo-login";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +12,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  async function handleDemoLogin() {
+    setError("");
+    setIsLoading(true);
+
+    try {
+      await loginAsDemo();
+    } catch (error) {
+      console.error("Demo login failed:", error);
+      setError("Unable to start the demo. Please try again.");
+      setIsLoading(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -119,6 +133,15 @@ export default function LoginPage() {
             className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLoading ? "Signing in..." : "Sign in"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDemoLogin}
+            disabled={isLoading}
+            className="w-full rounded-lg border border-blue-600 px-4 py-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLoading ? "Please wait..." : "Explore Live Demo"}
           </button>
         </form>
       </div>

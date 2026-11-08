@@ -4,7 +4,9 @@ import {
   getApiUser,
   forbiddenResponse,
   unauthorizedResponse,
+  demoReadOnlyResponse,
 } from "@/lib/api-auth";
+
 import {
   approveLeaveRequest,
   cancelLeaveRequest,
@@ -13,6 +15,7 @@ import {
   getLeaveRequests,
   rejectLeaveRequest,
 } from "@/services/leaveService";
+
 import type { LeaveDuration } from "@/types/leave";
 
 export async function GET(request: Request) {
@@ -27,7 +30,10 @@ export async function GET(request: Request) {
     const getAll = searchParams.get("all") === "true";
     const requestedEmployeeId = searchParams.get("employeeId");
 
-    if (user.role === "ADMIN") {
+    const canViewAllRequests =
+      user.role === "ADMIN" || user.role === "DEMO_VIEWER";
+
+    if (canViewAllRequests) {
       if (getAll) {
         const requests = await getLeaveRequests();
         return NextResponse.json({ data: requests });
@@ -43,10 +49,6 @@ export async function GET(request: Request) {
       const requests = await getEmployeeLeaveRequests(requestedEmployeeId);
 
       return NextResponse.json({ data: requests });
-    }
-
-    if (getAll) {
-      return forbiddenResponse();
     }
 
     if (!user.employeeId) {
@@ -75,6 +77,13 @@ export async function POST(request: Request) {
       return unauthorizedResponse();
     }
 
+    // Demo viewers cannot create leave requests.
+    const readOnlyResponse = demoReadOnlyResponse(user);
+
+    if (readOnlyResponse) {
+      return readOnlyResponse;
+    }
+
     const body: unknown = await request.json();
 
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -85,6 +94,7 @@ export async function POST(request: Request) {
     }
 
     const payload = body as Record<string, unknown>;
+
     const {
       employeeId: requestedEmployeeId,
       leaveTypeId,
@@ -164,6 +174,13 @@ export async function PATCH(request: Request) {
 
     if (!user) {
       return unauthorizedResponse();
+    }
+
+    // Demo viewers cannot approve, reject, or cancel requests.
+    const readOnlyResponse = demoReadOnlyResponse(user);
+
+    if (readOnlyResponse) {
+      return readOnlyResponse;
     }
 
     const body: unknown = await request.json();

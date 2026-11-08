@@ -79,6 +79,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     }),
+    Credentials({
+      id: "demo",
+      name: "Demo Access",
+      credentials: {},
+
+      async authorize() {
+        const email = process.env.DEMO_EMAIL?.trim().toLowerCase();
+
+        if (!email) {
+          return null;
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { email },
+          include: { employee: true },
+        });
+
+        if (
+          !user ||
+          user.role !== "DEMO_VIEWER" ||
+          !user.employeeId ||
+          !user.employee
+        ) {
+          return null;
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: `${user.employee.firstName} ${user.employee.lastName}`,
+          role: user.role,
+          employeeId: user.employeeId,
+        };
+      },
+    }),
   ],
 
   callbacks: {
@@ -102,7 +137,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               : null;
 
         const role =
-          token.role === "ADMIN" || token.role === "EMPLOYEE"
+          token.role === "ADMIN" ||
+          token.role === "EMPLOYEE" ||
+          token.role === "DEMO_VIEWER"
             ? token.role
             : null;
 

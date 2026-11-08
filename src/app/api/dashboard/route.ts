@@ -8,7 +8,19 @@ import {
 import {
   getDashboardStats,
   getLatestAttendanceDate,
+  type DashboardStats,
 } from "@/services/dashboardService";
+
+const DEMO_DASHBOARD_STATS: DashboardStats = {
+  totalEmployees: 24,
+  presentToday: 16,
+  lateToday: 2,
+  halfDayToday: 1,
+  absentToday: 2,
+  onLeaveToday: 3,
+  attendanceRate: 86,
+  pendingLeaveRequests: 3,
+};
 
 export async function GET() {
   try {
@@ -18,6 +30,18 @@ export async function GET() {
       return unauthorizedResponse();
     }
 
+    // Demo viewers receive fictional statistics only.
+    // Never query organization-wide database statistics for demo access.
+    if (user.role === "DEMO_VIEWER") {
+      return NextResponse.json({
+        data: {
+          date: new Date().toISOString().slice(0, 10),
+          stats: DEMO_DASHBOARD_STATS,
+        },
+      });
+    }
+
+    // Preserve existing Admin-only dashboard access.
     if (user.role !== "ADMIN") {
       return forbiddenResponse();
     }

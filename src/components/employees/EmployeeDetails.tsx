@@ -7,6 +7,7 @@ interface EmployeeDetailsProps {
   departments: Department[];
   onClose: () => void;
   onEdit: (employee: Employee) => void;
+  readOnly?: boolean;
 }
 
 const statusStyles: Record<Employee["status"], string> = {
@@ -16,17 +17,14 @@ const statusStyles: Record<Employee["status"], string> = {
   resigned: "bg-red-50 text-red-700",
 };
 
-const formatStatus = (status: Employee["status"]) => {
-  return status
+const formatStatus = (status: Employee["status"]) =>
+  status
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-};
 
 const formatDate = (date?: string) => {
-  if (!date) {
-    return "—";
-  }
+  if (!date) return "—";
 
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -40,6 +38,7 @@ export function EmployeeDetails({
   departments,
   onClose,
   onEdit,
+  readOnly = false,
 }: EmployeeDetailsProps) {
   const department = departments.find(
     (item) => item.id === employee.departmentId,
@@ -52,9 +51,7 @@ export function EmployeeDetails({
       aria-modal="true"
       aria-labelledby="employee-details-title"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
+        if (event.target === event.currentTarget) onClose();
       }}
     >
       <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl">
@@ -63,7 +60,6 @@ export function EmployeeDetails({
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
               Employee Details
             </p>
-
             <h2
               id="employee-details-title"
               className="mt-1 text-xl font-semibold text-gray-900"
@@ -96,11 +92,8 @@ export function EmployeeDetails({
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
               Status
             </p>
-
             <span
-              className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                statusStyles[employee.status]
-              }`}
+              className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[employee.status]}`}
             >
               {formatStatus(employee.status)}
             </span>
@@ -158,13 +151,17 @@ export function EmployeeDetails({
         </div>
 
         <div className="flex justify-between border-t px-6 py-4">
-          <button
-            type="button"
-            onClick={() => onEdit(employee)}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            Edit Employee
-          </button>
+          {!readOnly ? (
+            <button
+              type="button"
+              onClick={() => onEdit(employee)}
+              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            >
+              Edit Employee
+            </button>
+          ) : (
+            <span />
+          )}
 
           <button
             type="button"

@@ -12,6 +12,7 @@ import type { PaginatedEmployees } from "@/services/employeeService";
 
 interface EmployeeFiltersProps {
   initialEmployees: Employee[];
+  isDemoViewer?: boolean;
 }
 
 const PAGE_SIZE = 10;
@@ -24,7 +25,10 @@ const EMPTY_RESULT: PaginatedEmployees = {
   totalPages: 1,
 };
 
-export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
+export function EmployeeFilters({
+  initialEmployees,
+  isDemoViewer = false,
+}: EmployeeFiltersProps) {
   const [search, setSearch] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [status, setStatus] = useState<Employee["status"] | "">("");
@@ -137,6 +141,7 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
         if (err instanceof Error && err.name === "AbortError") {
           return;
         }
+
         // Department options remain empty until the endpoint is available.
       }
     }
@@ -175,12 +180,16 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
   };
 
   const handleEditEmployee = (employee: Employee) => {
+    if (isDemoViewer) {
+      return;
+    }
+
     setSelectedEmployee(null);
     setEditingEmployee(employee);
   };
 
   const handleDeactivateEmployee = async () => {
-    if (!employeeToDeactivate || isDeactivating) {
+    if (isDemoViewer || !employeeToDeactivate || isDeactivating) {
       return;
     }
 
@@ -223,16 +232,18 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
   return (
     <>
       <div className="mb-4 flex justify-end">
-        <button
-          type="button"
-          onClick={() => setIsCreateModalOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
-        >
-          <span aria-hidden="true" className="text-lg leading-none">
-            +
-          </span>
-          Add Employee
-        </button>
+        {!isDemoViewer && (
+          <button
+            type="button"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+          >
+            <span aria-hidden="true" className="text-lg leading-none">
+              +
+            </span>
+            Add Employee
+          </button>
+        )}
       </div>
 
       <div className="rounded-xl border bg-white p-4 shadow-sm">
@@ -383,6 +394,7 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
           onView={setSelectedEmployee}
           onEdit={handleEditEmployee}
           onDeactivate={setEmployeeToDeactivate}
+          readOnly={isDemoViewer}
         />
       </div>
 
@@ -422,10 +434,11 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
           departments={departments}
           onClose={() => setSelectedEmployee(null)}
           onEdit={handleEditEmployee}
+          readOnly={isDemoViewer}
         />
       )}
 
-      {(isCreateModalOpen || editingEmployee) && (
+      {!isDemoViewer && (isCreateModalOpen || editingEmployee) && (
         <EmployeeForm
           departments={departments}
           employee={editingEmployee ?? undefined}
@@ -442,8 +455,7 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
         />
       )}
 
-      {/* Deactivation Confirmation Dialog */}
-      {employeeToDeactivate && (
+      {!isDemoViewer && employeeToDeactivate && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
           onMouseDown={(event) => {
@@ -472,20 +484,6 @@ export function EmployeeFilters({ initialEmployees }: EmployeeFiltersProps) {
                   Deactivate Employee
                 </h2>
               </div>
-
-              <button
-                type="button"
-                onClick={() => void handleDeactivateEmployee()}
-                disabled={isDeactivating}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Loader2
-                  size={16}
-                  className={isDeactivating ? "animate-spin" : "invisible"}
-                />
-
-                {isDeactivating ? "Deactivating..." : "Deactivate"}
-              </button>
             </div>
 
             <p

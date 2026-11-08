@@ -144,7 +144,10 @@ export default async function MyAttendancePage({
     redirect("/login");
   }
 
-  if (session.user.role !== "EMPLOYEE" || !session.user.employeeId) {
+  if (
+    (session.user.role !== "EMPLOYEE" && session.user.role !== "DEMO_VIEWER") ||
+    !session.user.employeeId
+  ) {
     redirect("/dashboard");
   }
 

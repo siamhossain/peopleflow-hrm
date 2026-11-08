@@ -17,13 +17,16 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  if (session.user.role !== "ADMIN") {
+  const isDemoViewer = session.user.role === "DEMO_VIEWER";
+
+  if (session.user.role !== "ADMIN" && !isDemoViewer) {
     redirect("/employee/attendance");
   }
 
   return (
     <AppShell
       role="admin"
+      isDemoViewer={isDemoViewer}
       user={{
         name: session.user.name,
         email: session.user.email,

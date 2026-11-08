@@ -21,6 +21,7 @@ export async function GET(request: Request) {
     let employeeId: string;
 
     if (user.role === "ADMIN") {
+      // Admins can request any employee's leave balance.
       if (!requestedEmployeeId) {
         return NextResponse.json(
           { message: "Employee ID is required." },
@@ -29,13 +30,16 @@ export async function GET(request: Request) {
       }
 
       employeeId = requestedEmployeeId;
-    } else {
+    } else if (user.role === "EMPLOYEE" || user.role === "DEMO_VIEWER") {
+      // Employees and demo viewers can access only their own balance.
       if (!user.employeeId) {
         return forbiddenResponse();
       }
 
-      // Ignore any employeeId supplied by an employee.
+      // Ignore any employeeId supplied in the query string.
       employeeId = user.employeeId;
+    } else {
+      return forbiddenResponse();
     }
 
     const balances = await calculateLeaveBalance(employeeId);

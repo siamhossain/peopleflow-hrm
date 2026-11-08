@@ -10,7 +10,10 @@ export default async function EmployeeProfilePage() {
     redirect("/login");
   }
 
-  if (session.user.role !== "EMPLOYEE" || !session.user.employeeId) {
+  const isAllowedRole =
+    session.user.role === "EMPLOYEE" || session.user.role === "DEMO_VIEWER";
+
+  if (!isAllowedRole || !session.user.employeeId) {
     redirect("/dashboard");
   }
 

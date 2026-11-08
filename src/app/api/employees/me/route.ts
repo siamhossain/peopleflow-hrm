@@ -15,10 +15,17 @@ export async function GET() {
       return unauthorizedResponse();
     }
 
-    if (user.role !== "EMPLOYEE" || !user.employeeId) {
+    // Only employees and demo viewers with an associated employee
+    // record can access this endpoint.
+    if (
+      (user.role !== "EMPLOYEE" && user.role !== "DEMO_VIEWER") ||
+      !user.employeeId
+    ) {
       return forbiddenResponse();
     }
 
+    // Always use the authenticated user's employeeId.
+    // Never accept an employeeId from the request.
     const employee = await prisma.employee.findUnique({
       where: {
         id: user.employeeId,

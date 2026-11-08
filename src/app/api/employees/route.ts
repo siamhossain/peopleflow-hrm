@@ -4,13 +4,16 @@ import {
   forbiddenResponse,
   getApiUser,
   unauthorizedResponse,
+  demoReadOnlyResponse,
 } from "@/lib/api-auth";
+
 import {
   createEmployee,
   queryEmployees,
   type CreateEmployeeInput,
   type EmployeeQuery,
 } from "@/services/employeeService";
+
 import type { Employee } from "@/types/employee";
 
 const employeeStatuses = [
@@ -52,15 +55,14 @@ function isNonEmptyString(value: unknown): value is string {
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. Authenticate the request.
     const user = await getApiUser();
 
     if (!user) {
       return unauthorizedResponse();
     }
 
-    // 2. Only administrators can access the employee directory.
-    if (user.role !== "ADMIN") {
+    // Admin and Demo Viewer can view the employee directory.
+    if (user.role !== "ADMIN" && user.role !== "DEMO_VIEWER") {
       return forbiddenResponse();
     }
 
@@ -116,19 +118,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Authenticate the request.
     const user = await getApiUser();
 
     if (!user) {
       return unauthorizedResponse();
     }
 
-    // 2. Only administrators can create employees.
+    // Demo viewers cannot create employees.
+    const readOnlyResponse = demoReadOnlyResponse(user);
+
+    if (readOnlyResponse) {
+      return readOnlyResponse;
+    }
+
+    // Only administrators can create employees.
     if (user.role !== "ADMIN") {
       return forbiddenResponse();
     }
 
-    // 3. Parse and validate the request body.
     const body: unknown = await request.json();
 
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -187,7 +194,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Prepare the service input.
     const input: CreateEmployeeInput = {
       employeeCode: (data.employeeCode as string).trim(),
       firstName: (data.firstName as string).trim(),
@@ -201,7 +207,6 @@ export async function POST(request: NextRequest) {
         : {}),
     };
 
-    // 5. Create the employee.
     const employee = await createEmployee(input);
 
     return NextResponse.json(
@@ -212,7 +217,6 @@ export async function POST(request: NextRequest) {
       { status: 201 },
     );
   } catch (error: unknown) {
-    // Invalid JSON body.
     if (error instanceof SyntaxError) {
       return NextResponse.json(
         { message: "Request body contains invalid JSON." },
@@ -220,7 +224,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Duplicate email or employee code.
     if (
       typeof error === "object" &&
       error !== null &&
@@ -236,7 +239,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Invalid department.
     if (
       error instanceof Error &&
       error.message.toLowerCase().includes("department")

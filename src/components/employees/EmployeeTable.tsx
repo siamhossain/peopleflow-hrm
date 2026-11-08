@@ -7,6 +7,7 @@ interface EmployeeTableProps {
   onView: (employee: Employee) => void;
   onEdit: (employee: Employee) => void;
   onDeactivate: (employee: Employee) => void;
+  readOnly?: boolean;
 }
 
 const statusStyles: Record<Employee["status"], string> = {
@@ -16,20 +17,18 @@ const statusStyles: Record<Employee["status"], string> = {
   resigned: "bg-red-50 text-red-700",
 };
 
-const formatStatus = (status: Employee["status"]) => {
-  return status
+const formatStatus = (status: Employee["status"]) =>
+  status
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-};
 
-const formatDate = (date: string) => {
-  return new Intl.DateTimeFormat("en-US", {
+const formatDate = (date: string) =>
+  new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   }).format(new Date(`${date}T00:00:00`));
-};
 
 export function EmployeeTable({
   employees,
@@ -37,6 +36,7 @@ export function EmployeeTable({
   onView,
   onEdit,
   onDeactivate,
+  readOnly = false,
 }: EmployeeTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
@@ -116,7 +116,6 @@ export function EmployeeTable({
 
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-center gap-2">
-                      {/* View */}
                       <button
                         type="button"
                         onClick={() => onView(employee)}
@@ -127,29 +126,31 @@ export function EmployeeTable({
                         <Eye size={18} />
                       </button>
 
-                      {/* Edit */}
-                      <button
-                        type="button"
-                        onClick={() => onEdit(employee)}
-                        title="Edit employee"
-                        aria-label={`Edit ${employee.firstName} ${employee.lastName}`}
-                        className="rounded-md p-2 text-gray-500 transition hover:bg-amber-50 hover:text-amber-600"
-                      >
-                        <Pencil size={18} />
-                      </button>
+                      {!readOnly && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onEdit(employee)}
+                            title="Edit employee"
+                            aria-label={`Edit ${employee.firstName} ${employee.lastName}`}
+                            className="rounded-md p-2 text-gray-500 transition hover:bg-amber-50 hover:text-amber-600"
+                          >
+                            <Pencil size={18} />
+                          </button>
 
-                      {/* Deactivate */}
-                      {(employee.status === "active" ||
-                        employee.status === "on_leave") && (
-                        <button
-                          type="button"
-                          onClick={() => onDeactivate(employee)}
-                          title="Deactivate employee"
-                          aria-label={`Deactivate ${employee.firstName} ${employee.lastName}`}
-                          className="rounded-md p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600"
-                        >
-                          <UserX size={18} />
-                        </button>
+                          {(employee.status === "active" ||
+                            employee.status === "on_leave") && (
+                            <button
+                              type="button"
+                              onClick={() => onDeactivate(employee)}
+                              title="Deactivate employee"
+                              aria-label={`Deactivate ${employee.firstName} ${employee.lastName}`}
+                              className="rounded-md p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600"
+                            >
+                              <UserX size={18} />
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </td>

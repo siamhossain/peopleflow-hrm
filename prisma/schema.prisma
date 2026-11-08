@@ -51,6 +51,7 @@ model Employee {
 enum UserRole {
   ADMIN
   EMPLOYEE
+  DEMO_VIEWER
 }
 
 model User {

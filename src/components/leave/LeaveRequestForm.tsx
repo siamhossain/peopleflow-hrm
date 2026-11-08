@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 import { LeaveBalancePreview } from "@/components/leave/LeaveBalancePreview";
-import type { Employee } from "@/types/employee";
 import type { LeaveDuration, LeaveType } from "@/types/leave";
 
 interface LeaveRequestFormProps {
@@ -18,7 +17,7 @@ interface ApiResponse<T> {
 }
 
 interface PaginatedEmployees {
-  data: Employee[];
+  data: ApiEmployee[];
   total: number;
   page: number;
   pageSize: number;
@@ -74,17 +73,10 @@ export function LeaveRequestForm({
       setError("");
 
       try {
-        const [leaveTypesResponse, employeesResponse] = await Promise.all([
-          fetch("/api/leave/types"),
-          fetch("/api/employees?page=1&pageSize=100"),
-        ]);
+        const leaveTypesResponse = await fetch("/api/leave/types");
 
         const leaveTypesResult =
           (await leaveTypesResponse.json()) as ApiResponse<ApiLeaveType[]>;
-
-        const employeesResult = (await employeesResponse.json()) as ApiResponse<
-          PaginatedEmployees | ApiEmployee[]
-        >;
 
         if (!leaveTypesResponse.ok) {
           throw new Error(
@@ -92,22 +84,40 @@ export function LeaveRequestForm({
           );
         }
 
-        if (!employeesResponse.ok) {
-          throw new Error(
-            employeesResult.message ?? "Failed to load employees.",
-          );
-        }
-
         if (!Array.isArray(leaveTypesResult.data)) {
           throw new Error("Invalid leave types response.");
         }
 
-        const employeeData = Array.isArray(employeesResult.data)
-          ? employeesResult.data
-          : employeesResult.data?.data;
+        let activeEmployees: ApiEmployee[] = [];
 
-        if (!Array.isArray(employeeData)) {
-          throw new Error("Invalid employees response.");
+        // Only Admin needs to load the employee list.
+        if (!isEmployeePortal) {
+          const employeesResponse = await fetch(
+            "/api/employees?page=1&pageSize=100",
+          );
+
+          const employeesResult =
+            (await employeesResponse.json()) as ApiResponse<
+              PaginatedEmployees | ApiEmployee[]
+            >;
+
+          if (!employeesResponse.ok) {
+            throw new Error(
+              employeesResult.message ?? "Failed to load employees.",
+            );
+          }
+
+          const employeeData = Array.isArray(employeesResult.data)
+            ? employeesResult.data
+            : employeesResult.data?.data;
+
+          if (!Array.isArray(employeeData)) {
+            throw new Error("Invalid employees response.");
+          }
+
+          activeEmployees = employeeData.filter(
+            (employee) => employee.status.toLowerCase() === "active",
+          );
         }
 
         if (cancelled) return;
@@ -122,13 +132,9 @@ export function LeaveRequestForm({
           })),
         );
 
-        const activeEmployees = employeeData.filter(
-          (employee) => employee.status.toLowerCase() === "active",
-        );
-
-        setEmployees(activeEmployees);
-
         if (!isEmployeePortal) {
+          setEmployees(activeEmployees);
+
           setSelectedEmployeeId((currentId) => {
             if (
               currentId &&
@@ -139,6 +145,8 @@ export function LeaveRequestForm({
 
             return activeEmployees[0]?.id ?? "";
           });
+        } else {
+          setSelectedEmployeeId(employeeId ?? "");
         }
       } catch (err) {
         if (!cancelled) {
@@ -160,7 +168,7 @@ export function LeaveRequestForm({
     return () => {
       cancelled = true;
     };
-  }, [isEmployeePortal]);
+  }, [employeeId, isEmployeePortal]);
 
   const handleLeaveTypeChange = (value: string) => {
     setLeaveTypeId(value);
@@ -252,6 +260,7 @@ export function LeaveRequestForm({
                 >
                   Employee
                 </label>
+
                 <select
                   id="employee"
                   value={selectedEmployeeId}
@@ -264,6 +273,7 @@ export function LeaveRequestForm({
                   className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400 disabled:bg-gray-100"
                 >
                   <option value="">Select employee</option>
+
                   {employees.map((employee) => (
                     <option key={employee.id} value={employee.id}>
                       {employee.firstName} {employee.lastName} (
@@ -271,6 +281,7 @@ export function LeaveRequestForm({
                     </option>
                   ))}
                 </select>
+
                 {employees.length === 0 && (
                   <p className="mt-1 text-sm text-gray-500">
                     No active employees are available.
@@ -286,6 +297,7 @@ export function LeaveRequestForm({
               >
                 Leave Type
               </label>
+
               <select
                 id="leaveType"
                 value={leaveTypeId}
@@ -295,12 +307,14 @@ export function LeaveRequestForm({
                 className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400 disabled:bg-gray-100"
               >
                 <option value="">Select leave type</option>
+
                 {leaveTypes.map((leaveType) => (
                   <option key={leaveType.id} value={leaveType.id}>
                     {leaveType.name}
                   </option>
                 ))}
               </select>
+
               {leaveTypes.length === 0 && (
                 <p className="mt-1 text-sm text-gray-500">
                   No active leave types are available.
@@ -315,6 +329,7 @@ export function LeaveRequestForm({
               >
                 Start Date
               </label>
+
               <input
                 id="startDate"
                 type="date"
@@ -335,6 +350,7 @@ export function LeaveRequestForm({
               >
                 End Date
               </label>
+
               <input
                 id="endDate"
                 type="date"
@@ -356,6 +372,7 @@ export function LeaveRequestForm({
               >
                 Duration
               </label>
+
               <select
                 id="duration"
                 value={duration}
@@ -363,6 +380,7 @@ export function LeaveRequestForm({
                 className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400"
               >
                 <option value="full_day">Full Day</option>
+
                 {selectedLeaveType?.allowHalfDay && (
                   <option value="half_day">Half Day</option>
                 )}
@@ -381,6 +399,7 @@ export function LeaveRequestForm({
               >
                 Reason
               </label>
+
               <textarea
                 id="reason"
                 value={reason}
@@ -414,13 +433,14 @@ export function LeaveRequestForm({
             >
               Cancel
             </button>
+
             <button
               type="submit"
               disabled={
                 isSubmitting ||
                 !selectedEmployeeId ||
                 !leaveTypeId ||
-                employees.length === 0 ||
+                (!isEmployeePortal && employees.length === 0) ||
                 leaveTypes.length === 0
               }
               className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"

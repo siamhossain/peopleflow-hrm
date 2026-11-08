@@ -27,8 +27,11 @@ export async function GET(request: Request) {
       return unauthorizedResponse();
     }
 
-    // 2. Employees must have an associated employee record.
-    if (user.role === "EMPLOYEE" && !user.employeeId) {
+    // 2. Employees and demo viewers must have an associated employee record.
+    if (
+      (user.role === "EMPLOYEE" || user.role === "DEMO_VIEWER") &&
+      !user.employeeId
+    ) {
       return forbiddenResponse();
     }
 
@@ -85,17 +88,20 @@ export async function GET(request: Request) {
       );
     }
 
-    // 6. Build a role-restricted query.
-    const isAdmin = user.role === "ADMIN";
+    // 6. ADMIN and DEMO_VIEWER can view attendance across all employees.
+    // EMPLOYEE can only view their own attendance.
+    const canViewAllEmployees =
+      user.role === "ADMIN" || user.role === "DEMO_VIEWER";
 
-    const employeeId = isAdmin
+    const employeeId = canViewAllEmployees
       ? searchParams.get("employeeId") || undefined
-      : user.employeeId!;
+      : (user.employeeId ?? undefined);
 
-    const departmentId = isAdmin
+    const departmentId = canViewAllEmployees
       ? searchParams.get("departmentId") || undefined
       : undefined;
 
+    // 7. Fetch attendance records.
     const result = await getPaginatedAttendanceList(
       {
         employeeId,
