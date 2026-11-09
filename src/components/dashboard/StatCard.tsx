@@ -1,21 +1,7 @@
-interface StatCardProps {
-  label: string;
-  value: number | string;
-  description?: string;
-}
+import { StatCard as UIStatCard, type StatCardProps } from "@/components/ui/StatCard";
 
-export function StatCard({ label, value, description }: StatCardProps) {
-  return (
-    <div className="rounded-xl border bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-gray-500">{label}</p>
+export { type StatCardProps };
 
-      <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900">
-        {value}
-      </p>
-
-      {description && (
-        <p className="mt-1 text-xs text-gray-500">{description}</p>
-      )}
-    </div>
-  );
+export function StatCard(props: StatCardProps) {
+  return <UIStatCard {...props} />;
 }

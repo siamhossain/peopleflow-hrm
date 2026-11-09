@@ -1,6 +1,8 @@
 "use client";
 
 import type { LeaveRequest } from "@/types/leave";
+import { Eye, Check, X, Ban } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface LeaveRequestActionsProps {
   request: LeaveRequest;
@@ -21,43 +23,52 @@ export function LeaveRequestActions({
   const isApproved = request.status === "approved";
 
   return (
-    <div className="flex items-center gap-3 whitespace-nowrap">
-      <button
+    <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         onClick={onView}
-        className="text-sm font-medium text-gray-600 hover:text-gray-900"
+        leftIcon={<Eye className="h-3.5 w-3.5" />}
+        aria-label="View request details"
       >
         View
-      </button>
+      </Button>
 
       {isPending && (
         <>
-          <button
+          <Button
             type="button"
+            variant="success"
+            size="sm"
             onClick={onApprove}
-            className="text-sm font-medium text-green-600 hover:text-green-700"
+            leftIcon={<Check className="h-3.5 w-3.5" />}
           >
             Approve
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
+            variant="danger"
+            size="sm"
             onClick={onReject}
-            className="text-sm font-medium text-red-600 hover:text-red-700"
+            leftIcon={<X className="h-3.5 w-3.5" />}
           >
             Reject
-          </button>
+          </Button>
         </>
       )}
 
       {isApproved && (
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={onCancel}
-          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+          leftIcon={<Ban className="h-3.5 w-3.5 text-slate-400" />}
         >
           Cancel
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AlertCircle, CalendarPlus, Loader2 } from "lucide-react";
 
 import { LeaveBalancePreview } from "@/components/leave/LeaveBalancePreview";
 import type { LeaveDuration, LeaveType } from "@/types/leave";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
 
 interface LeaveRequestFormProps {
   employeeId?: string;
@@ -232,37 +237,36 @@ export function LeaveRequestForm({
   };
 
   return (
-    <div className="rounded-xl border bg-white shadow-sm">
-      <div className="border-b px-6 py-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-          Leave Management
-        </p>
-        <h2 className="mt-1 text-lg font-semibold text-gray-900">
-          Create Leave Request
-        </h2>
-        <p className="mt-1 text-sm text-gray-600">
-          Submit a new leave request for an employee.
-        </p>
+    <Card className="overflow-hidden p-0 shadow-sm">
+      <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/75 px-6 py-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200/60">
+          <CalendarPlus className="h-4.5 w-4.5" />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-slate-900">
+            Create Leave Application
+          </h2>
+          <p className="text-xs text-slate-500">
+            Submit a new time-off request with duration and quota allocation check.
+          </p>
+        </div>
       </div>
 
       {isLoading ? (
-        <p className="px-6 py-8 text-sm text-gray-600">
-          Loading leave request form...
-        </p>
+        <div className="flex flex-col items-center justify-center p-12 text-slate-400">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-2" />
+          <p className="text-xs font-medium text-slate-500">
+            Loading leave categories and balances...
+          </p>
+        </div>
       ) : (
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-5 px-6 py-6 sm:grid-cols-2">
+          <div className="grid gap-5 p-6 sm:grid-cols-2">
             {!isEmployeePortal && (
               <div>
-                <label
-                  htmlFor="employee"
-                  className="mb-1.5 block text-sm font-medium text-gray-700"
-                >
-                  Employee
-                </label>
-
-                <select
+                <Select
                   id="employee"
+                  label="Select Employee"
                   value={selectedEmployeeId}
                   onChange={(event) => {
                     setSelectedEmployeeId(event.target.value);
@@ -270,20 +274,18 @@ export function LeaveRequestForm({
                   }}
                   required
                   disabled={employees.length === 0}
-                  className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400 disabled:bg-gray-100"
                 >
                   <option value="">Select employee</option>
-
                   {employees.map((employee) => (
                     <option key={employee.id} value={employee.id}>
                       {employee.firstName} {employee.lastName} (
                       {employee.employeeCode})
                     </option>
                   ))}
-                </select>
+                </Select>
 
                 {employees.length === 0 && (
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-xs text-slate-400">
                     No active employees are available.
                   </p>
                 )}
@@ -291,47 +293,33 @@ export function LeaveRequestForm({
             )}
 
             <div>
-              <label
-                htmlFor="leaveType"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
-              >
-                Leave Type
-              </label>
-
-              <select
+              <Select
                 id="leaveType"
+                label="Leave Category"
                 value={leaveTypeId}
                 onChange={(event) => handleLeaveTypeChange(event.target.value)}
                 required
                 disabled={leaveTypes.length === 0}
-                className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400 disabled:bg-gray-100"
               >
-                <option value="">Select leave type</option>
-
+                <option value="">Select leave category</option>
                 {leaveTypes.map((leaveType) => (
                   <option key={leaveType.id} value={leaveType.id}>
                     {leaveType.name}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {leaveTypes.length === 0 && (
-                <p className="mt-1 text-sm text-gray-500">
-                  No active leave types are available.
+                <p className="mt-1 text-xs text-slate-400">
+                  No active leave categories are available.
                 </p>
               )}
             </div>
 
             <div>
-              <label
-                htmlFor="startDate"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
-              >
-                Start Date
-              </label>
-
-              <input
+              <Input
                 id="startDate"
+                label="Start Date"
                 type="date"
                 value={startDate}
                 onChange={(event) => {
@@ -339,20 +327,13 @@ export function LeaveRequestForm({
                   setError("");
                 }}
                 required
-                className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400"
               />
             </div>
 
             <div>
-              <label
-                htmlFor="endDate"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
-              >
-                End Date
-              </label>
-
-              <input
+              <Input
                 id="endDate"
+                label="End Date"
                 type="date"
                 value={endDate}
                 onChange={(event) => {
@@ -361,30 +342,21 @@ export function LeaveRequestForm({
                 }}
                 required
                 min={startDate || undefined}
-                className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400"
               />
             </div>
 
-            <div>
-              <label
-                htmlFor="duration"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
-              >
-                Duration
-              </label>
-
-              <select
+            <div className={!isEmployeePortal ? "" : "sm:col-span-2"}>
+              <Select
                 id="duration"
+                label="Duration Mode"
                 value={duration}
                 onChange={(event) => handleDurationChange(event.target.value)}
-                className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400"
               >
-                <option value="full_day">Full Day</option>
-
+                <option value="full_day">Full Day (1.0)</option>
                 {selectedLeaveType?.allowHalfDay && (
-                  <option value="half_day">Half Day</option>
+                  <option value="half_day">Half Day (0.5)</option>
                 )}
-              </select>
+              </Select>
             </div>
 
             <LeaveBalancePreview
@@ -395,9 +367,9 @@ export function LeaveRequestForm({
             <div className="sm:col-span-2">
               <label
                 htmlFor="reason"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
+                className="mb-1.5 block text-xs font-medium text-slate-700 select-none"
               >
-                Reason
+                Reason / Remarks <span className="text-rose-500">*</span>
               </label>
 
               <textarea
@@ -408,34 +380,37 @@ export function LeaveRequestForm({
                   setError("");
                 }}
                 required
-                rows={4}
-                placeholder="Enter the reason for this leave request..."
-                className="w-full resize-none rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400"
+                rows={3}
+                placeholder="State the reason for taking leave..."
+                className="w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 shadow-xs focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
 
             {error && (
               <div
                 role="alert"
-                className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:col-span-2"
+                className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700 sm:col-span-2"
               >
-                {error}
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-3 border-t px-6 py-4">
-            <button
+          <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-4">
+            <Button
               type="button"
+              variant="secondary"
               onClick={onCancel}
               disabled={isSubmitting}
-              className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              isLoading={isSubmitting}
               disabled={
                 isSubmitting ||
                 !selectedEmployeeId ||
@@ -443,13 +418,12 @@ export function LeaveRequestForm({
                 (!isEmployeePortal && employees.length === 0) ||
                 leaveTypes.length === 0
               }
-              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isSubmitting ? "Submitting..." : "Submit Request"}
-            </button>
+              Submit Application
+            </Button>
           </div>
         </form>
       )}
-    </div>
+    </Card>
   );
 }

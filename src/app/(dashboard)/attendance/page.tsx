@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AlertCircle, CalendarDays, FilterX, Loader2 } from "lucide-react";
 
 import { AttendanceTable } from "@/components/attendance/AttendanceTable";
 import { departments } from "@/data/departments";
@@ -8,6 +9,12 @@ import type {
   AttendanceListItem,
   PaginatedAttendance,
 } from "@/types/attendance";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Pagination } from "@/components/ui/Pagination";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const PAGE_SIZE = 25;
 const DEFAULT_MONTH = "2026-08";
@@ -154,11 +161,6 @@ export default function AttendancePage() {
     };
   }, [selectedMonth, selectedStatus, selectedDepartment, page]);
 
-  const firstRecord =
-    result.total === 0 ? 0 : (result.page - 1) * PAGE_SIZE + 1;
-
-  const lastRecord = Math.min(result.page * PAGE_SIZE, result.total);
-
   const clearFilters = () => {
     setSelectedMonth("");
     setSelectedStatus("all");
@@ -166,257 +168,174 @@ export default function AttendancePage() {
     setPage(1);
   };
 
-  const getPageNumbers = () => {
-    const totalPages = result.totalPages;
-    const currentPage = result.page;
-
-    if (totalPages <= 5) {
-      return Array.from({ length: totalPages }, (_, index) => index + 1);
-    }
-
-    if (currentPage <= 3) {
-      return [1, 2, 3, 4, "...", totalPages];
-    }
-
-    if (currentPage >= totalPages - 2) {
-      return [
-        1,
-        "...",
-        totalPages - 3,
-        totalPages - 2,
-        totalPages - 1,
-        totalPages,
-      ];
-    }
-
-    return [
-      1,
-      "...",
-      currentPage - 1,
-      currentPage,
-      currentPage + 1,
-      "...",
-      totalPages,
-    ];
-  };
-
-  const goToPage = (nextPage: number) => {
-    if (nextPage < 1 || nextPage > result.totalPages || nextPage === page) {
-      return;
-    }
-
-    setPage(nextPage);
-  };
+  const hasActiveFilters = Boolean(
+    selectedMonth || selectedStatus !== "all" || selectedDepartment,
+  );
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Attendance</h1>
-
-        <p className="mt-1 text-sm text-gray-500">
-          View and manage employee attendance records.
-        </p>
+      {/* Page Header */}
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
+            Time & Attendance
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Attendance
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Track daily employee presence, punch-in/out stamps, working hours, and departmental trends.
+          </p>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-gray-900">Filters</h2>
+      {/* Filter Card */}
+      <Card className="p-4 sm:p-5">
+        <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-slate-400" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Filter Attendance Logs
+            </h2>
+          </div>
 
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={clearFilters}
-            disabled={
-              isLoading ||
-              (!selectedMonth &&
-                selectedStatus === "all" &&
-                !selectedDepartment)
-            }
-            className="text-sm font-medium text-gray-600 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={isLoading || !hasActiveFilters}
+            leftIcon={<FilterX className="h-3.5 w-3.5" />}
           >
             Clear filters
-          </button>
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {/* Original month picker */}
+          {/* Month Picker */}
           <div>
-            <label
-              htmlFor="attendance-month"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
-            >
-              Month
-            </label>
-
-            <input
+            <Input
               id="attendance-month"
               type="month"
+              label="Select Month"
               value={selectedMonth}
               onChange={(event) => {
                 setSelectedMonth(event.target.value);
                 setPage(1);
               }}
-              className="w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
             />
           </div>
 
-          {/* Department filter */}
+          {/* Department Filter */}
           <div>
-            <label
-              htmlFor="attendance-department"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
-            >
-              Department
-            </label>
-
-            <select
+            <Select
               id="attendance-department"
+              label="Department"
               value={selectedDepartment}
               onChange={(event) => {
                 setSelectedDepartment(event.target.value);
                 setPage(1);
               }}
-              className="w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
             >
               <option value="">All Departments</option>
-
               {departments.map((department) => (
                 <option key={department.id} value={department.id}>
                   {department.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
-          {/* Status filter */}
+          {/* Status Filter */}
           <div>
-            <label
-              htmlFor="attendance-status"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
-            >
-              Status
-            </label>
-
-            <select
+            <Select
               id="attendance-status"
+              label="Attendance Status"
               value={selectedStatus}
               onChange={(event) => {
                 setSelectedStatus(event.target.value);
                 setPage(1);
               }}
-              className="w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
             >
               {statusOptions.map((status) => (
                 <option key={status.value} value={status.value}>
                   {status.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Attendance records */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4">
+      {/* Attendance Records Card */}
+      <Card className="overflow-hidden p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div>
-            <h2 className="font-semibold text-gray-900">Attendance Records</h2>
-
-            <p className="mt-1 text-sm text-gray-500">
-              {formatMonth(selectedMonth)}
+            <h2 className="text-base font-semibold text-slate-900">
+              Attendance Records
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Viewing entries for:{" "}
+              <span className="font-medium text-slate-700">
+                {formatMonth(selectedMonth)}
+              </span>
             </p>
           </div>
 
-          <p className="text-sm text-gray-500">
-            {isLoading ? "Loading records..." : `${result.total} total records`}
-          </p>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+              {isLoading ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Updating...
+                </span>
+              ) : (
+                `${result.total} total logs`
+              )}
+            </span>
+          </div>
         </div>
 
         {error ? (
-          <div className="p-8 text-center">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="p-8">
+            <div
+              role="alert"
+              className="flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
           </div>
         ) : isLoading ? (
-          <div className="p-8 text-center">
-            <p className="text-sm text-gray-500">
+          <div className="flex flex-col items-center justify-center p-12 text-slate-400">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
+            <p className="text-sm font-medium text-slate-600">
               Loading attendance records...
             </p>
           </div>
         ) : result.data.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="font-medium text-gray-900">
-              No attendance records found
-            </p>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Try changing or clearing your filters.
-            </p>
-          </div>
+          <EmptyState
+            icon={CalendarDays}
+            title="No attendance records found"
+            description="We couldn't find any entries matching your current month or filter settings. Try adjusting your selections."
+          />
         ) : (
           <>
             <AttendanceTable records={result.data as AttendanceListItem[]} />
 
-            {/* Pagination */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 px-5 py-4">
-              <p className="text-sm text-gray-500">
-                Showing{" "}
-                <span className="font-medium text-gray-900">{firstRecord}</span>{" "}
-                to{" "}
-                <span className="font-medium text-gray-900">{lastRecord}</span>{" "}
-                of{" "}
-                <span className="font-medium text-gray-900">
-                  {result.total}
-                </span>{" "}
-                records
-              </p>
-
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => goToPage(page - 1)}
-                  disabled={page <= 1}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Previous
-                </button>
-
-                {getPageNumbers().map((pageNumber, index) => (
-                  <button
-                    key={`${pageNumber}-${index}`}
-                    type="button"
-                    disabled={pageNumber === "..."}
-                    onClick={() => {
-                      if (typeof pageNumber === "number") {
-                        goToPage(pageNumber);
-                      }
-                    }}
-                    className={`min-w-9 rounded-lg border px-3 py-2 text-sm ${
-                      pageNumber === page
-                        ? "border-gray-900 bg-gray-900 text-white"
-                        : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                    } ${
-                      pageNumber === "..."
-                        ? "cursor-default border-transparent"
-                        : ""
-                    }`}
-                  >
-                    {pageNumber}
-                  </button>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={() => goToPage(page + 1)}
-                  disabled={page >= result.totalPages}
-                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            {/* Reusable Pagination Component */}
+            {result.totalPages > 1 && (
+              <Pagination
+                currentPage={result.page}
+                totalPages={result.totalPages}
+                totalRecords={result.total}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+              />
+            )}
           </>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

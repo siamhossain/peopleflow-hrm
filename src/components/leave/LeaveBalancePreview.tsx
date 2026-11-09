@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AlertCircle, CalendarCheck, Clock, Loader2 } from "lucide-react";
 
 interface LeaveBalance {
   leaveTypeId: string;
@@ -80,8 +81,11 @@ export function LeaveBalancePreview({
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:col-span-2">
-        <p className="text-sm text-gray-600">Loading leave balance...</p>
+      <div className="rounded-xl border border-slate-200/80 bg-slate-50/75 p-4 sm:col-span-2">
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+          <span>Calculating remaining leave allowance...</span>
+        </div>
       </div>
     );
   }
@@ -90,9 +94,10 @@ export function LeaveBalancePreview({
     return (
       <div
         role="alert"
-        className="rounded-lg border border-red-200 bg-red-50 p-4 sm:col-span-2"
+        className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-medium text-rose-700 sm:col-span-2"
       >
-        <p className="text-sm text-red-700">{error}</p>
+        <AlertCircle className="h-4 w-4 shrink-0" />
+        <span>{error}</span>
       </div>
     );
   }
@@ -102,48 +107,59 @@ export function LeaveBalancePreview({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:col-span-2">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-          Leave Balance
-        </p>
-
-        <p className="mt-1 text-sm text-gray-600">
-          Current balance for the selected employee and leave type.
-        </p>
+    <div className="rounded-xl border border-indigo-100 bg-indigo-50/30 p-4 sm:col-span-2 shadow-2xs">
+      <div className="flex items-center justify-between border-b border-indigo-100/60 pb-3">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <CalendarCheck className="h-4 w-4 text-indigo-600" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-700">
+              Leave Allowance Overview
+            </p>
+          </div>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Current balance quota for {balance.leaveTypeName}
+          </p>
+        </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div>
-          <p className="text-xs text-gray-500">Allocated</p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">
+      <div className="mt-3.5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {/* Allocated */}
+        <div className="rounded-lg border border-slate-200/60 bg-white p-3 text-center shadow-2xs">
+          <p className="text-[11px] font-medium text-slate-500">Allocated</p>
+          <p className="mt-1 text-xl font-bold tracking-tight text-slate-900">
             {balance.allocatedDays}
           </p>
-          <p className="text-xs text-gray-500">days</p>
+          <p className="text-[11px] text-slate-400">days</p>
         </div>
 
-        <div>
-          <p className="text-xs text-gray-500">Used</p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">
+        {/* Used */}
+        <div className="rounded-lg border border-slate-200/60 bg-white p-3 text-center shadow-2xs">
+          <p className="text-[11px] font-medium text-slate-500">Used</p>
+          <p className="mt-1 text-xl font-bold tracking-tight text-slate-700">
             {balance.usedDays}
           </p>
-          <p className="text-xs text-gray-500">days</p>
+          <p className="text-[11px] text-slate-400">days</p>
         </div>
 
-        <div>
-          <p className="text-xs text-gray-500">Pending</p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">
+        {/* Pending */}
+        <div className="rounded-lg border border-amber-200/60 bg-amber-50/40 p-3 text-center shadow-2xs">
+          <div className="flex items-center justify-center gap-1">
+            <Clock className="h-3 w-3 text-amber-600" />
+            <p className="text-[11px] font-medium text-amber-700">Pending</p>
+          </div>
+          <p className="mt-1 text-xl font-bold tracking-tight text-amber-700">
             {balance.pendingDays}
           </p>
-          <p className="text-xs text-gray-500">days</p>
+          <p className="text-[11px] text-amber-600/70">days</p>
         </div>
 
-        <div>
-          <p className="text-xs text-gray-500">Remaining</p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">
+        {/* Remaining */}
+        <div className="rounded-lg border border-indigo-200/60 bg-indigo-50/60 p-3 text-center shadow-2xs">
+          <p className="text-[11px] font-semibold text-indigo-700">Remaining</p>
+          <p className="mt-1 text-xl font-extrabold tracking-tight text-indigo-600">
             {balance.remainingDays}
           </p>
-          <p className="text-xs text-gray-500">days</p>
+          <p className="text-[11px] text-indigo-500">days</p>
         </div>
       </div>
     </div>

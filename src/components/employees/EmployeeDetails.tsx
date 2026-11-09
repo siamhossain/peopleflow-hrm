@@ -1,6 +1,17 @@
 "use client";
 
 import type { Department, Employee } from "@/types/employee";
+import { Modal } from "@/components/ui/Modal";
+import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import {
+  Building2,
+  Calendar,
+  Briefcase,
+  Mail,
+  Hash,
+  Pencil,
+} from "lucide-react";
 
 interface EmployeeDetailsProps {
   employee: Employee;
@@ -10,11 +21,11 @@ interface EmployeeDetailsProps {
   readOnly?: boolean;
 }
 
-const statusStyles: Record<Employee["status"], string> = {
-  active: "bg-green-50 text-green-700",
-  inactive: "bg-gray-100 text-gray-600",
-  on_leave: "bg-amber-50 text-amber-700",
-  resigned: "bg-red-50 text-red-700",
+const statusBadgeVariants: Record<Employee["status"], BadgeVariant> = {
+  active: "success",
+  inactive: "neutral",
+  on_leave: "warning",
+  resigned: "danger",
 };
 
 const formatStatus = (status: Employee["status"]) =>
@@ -26,11 +37,15 @@ const formatStatus = (status: Employee["status"]) =>
 const formatDate = (date?: string) => {
   if (!date) return "—";
 
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(`${date}T00:00:00`));
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(`${date}T00:00:00`));
+  } catch {
+    return date;
+  }
 };
 
 export function EmployeeDetails({
@@ -44,134 +59,157 @@ export function EmployeeDetails({
     (item) => item.id === employee.departmentId,
   );
 
+  const initials = `${employee.firstName[0] || ""}${
+    employee.lastName[0] || ""
+  }`.toUpperCase();
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="employee-details-title"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Employee Profile"
+      description="Detailed employee records and organizational assignment."
+      size="lg"
     >
-      <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl">
-        <div className="flex items-start justify-between border-b px-6 py-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Employee Details
-            </p>
-            <h2
-              id="employee-details-title"
-              className="mt-1 text-xl font-semibold text-gray-900"
-            >
-              {employee.firstName} {employee.lastName}
-            </h2>
+      <div className="space-y-6">
+        {/* Profile Card Header */}
+        <div className="flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-base font-bold text-white shadow-xs">
+            {initials}
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close employee details"
-            className="rounded-lg p-2 text-xl leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="grid gap-5 px-6 py-6 sm:grid-cols-2">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Employee Code
-            </p>
-            <p className="mt-1 text-sm font-medium text-gray-900">
-              {employee.employeeCode}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Status
-            </p>
-            <span
-              className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[employee.status]}`}
-            >
-              {formatStatus(employee.status)}
-            </span>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Email
-            </p>
-            <p className="mt-1 text-sm text-gray-900">{employee.email}</p>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Designation
-            </p>
-            <p className="mt-1 text-sm text-gray-900">{employee.designation}</p>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Department
-            </p>
-            <p className="mt-1 text-sm text-gray-900">
-              {department?.name ?? employee.departmentId}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Department Code
-            </p>
-            <p className="mt-1 text-sm text-gray-900">
-              {department?.code ?? "—"}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Joining Date
-            </p>
-            <p className="mt-1 text-sm text-gray-900">
-              {formatDate(employee.joiningDate)}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Resignation Date
-            </p>
-            <p className="mt-1 text-sm text-gray-900">
-              {formatDate(employee.resignationDate)}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-lg font-bold text-slate-900 truncate">
+                {employee.firstName} {employee.lastName}
+              </h3>
+              <Badge variant={statusBadgeVariants[employee.status]} dot>
+                {formatStatus(employee.status)}
+              </Badge>
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {employee.designation} • {department?.name ?? "General"}
             </p>
           </div>
         </div>
 
-        <div className="flex justify-between border-t px-6 py-4">
+        {/* Structured Details Grid */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {/* Employee Code */}
+          <div className="flex items-start gap-3 rounded-xl border border-slate-100 p-3.5 bg-white shadow-2xs">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Hash className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Employee Code
+              </p>
+              <p className="mt-0.5 font-mono text-sm font-semibold text-slate-900">
+                {employee.employeeCode}
+              </p>
+            </div>
+          </div>
+
+          {/* Email */}
+          <div className="flex items-start gap-3 rounded-xl border border-slate-100 p-3.5 bg-white shadow-2xs">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Mail className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Work Email
+              </p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-900 truncate">
+                {employee.email}
+              </p>
+            </div>
+          </div>
+
+          {/* Designation */}
+          <div className="flex items-start gap-3 rounded-xl border border-slate-100 p-3.5 bg-white shadow-2xs">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Briefcase className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Designation
+              </p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                {employee.designation}
+              </p>
+            </div>
+          </div>
+
+          {/* Department */}
+          <div className="flex items-start gap-3 rounded-xl border border-slate-100 p-3.5 bg-white shadow-2xs">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Building2 className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Department
+              </p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                {department?.name ?? employee.departmentId}
+                {department?.code && (
+                  <span className="ml-1.5 text-xs text-slate-400 font-mono">
+                    ({department.code})
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Joining Date */}
+          <div className="flex items-start gap-3 rounded-xl border border-slate-100 p-3.5 bg-white shadow-2xs">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Calendar className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Joining Date
+              </p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                {formatDate(employee.joiningDate)}
+              </p>
+            </div>
+          </div>
+
+          {/* Resignation Date */}
+          <div className="flex items-start gap-3 rounded-xl border border-slate-100 p-3.5 bg-white shadow-2xs">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Calendar className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Resignation Date
+              </p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                {formatDate(employee.resignationDate)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div className="flex items-center justify-between border-t border-slate-100 pt-4">
           {!readOnly ? (
-            <button
+            <Button
               type="button"
+              variant="primary"
+              leftIcon={<Pencil className="h-4 w-4" />}
               onClick={() => onEdit(employee)}
-              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
             >
               Edit Employee
-            </button>
+            </Button>
           ) : (
             <span />
           )}
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
+          <Button type="button" variant="secondary" onClick={onClose}>
             Close
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

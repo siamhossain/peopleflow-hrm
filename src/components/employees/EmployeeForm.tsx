@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { AlertCircle } from "lucide-react";
 
 import type { Department, Employee } from "@/types/employee";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
 
 type EditableEmployee = Employee & {
   phone?: string | null;
@@ -130,231 +135,142 @@ export function EmployeeForm({
     }
   };
 
-  const inputClassName =
-    "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-100";
-
-  const labelClassName = "mb-1.5 block text-sm font-medium text-gray-700";
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !isSubmitting) {
-          onClose();
-        }
-      }}
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={isEditing ? "Edit Employee" : "Add New Employee"}
+      description={
+        isEditing
+          ? "Update the employee's personal and organizational details."
+          : "Provide the employee's information to register them in the system."
+      }
+      size="lg"
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="employee-form-title"
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-xl"
-      >
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <div>
-            <h2
-              id="employee-form-title"
-              className="text-lg font-semibold text-gray-900"
-            >
-              {isEditing ? "Edit Employee" : "Add New Employee"}
-            </h2>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            id="employeeCode"
+            name="employeeCode"
+            label="Employee Code"
+            value={formData.employeeCode}
+            onChange={handleChange}
+            required
+            maxLength={30}
+            placeholder="EMP-001"
+          />
 
-            <p className="mt-1 text-sm text-gray-500">
-              {isEditing
-                ? "Update the employee's information below."
-                : "Enter the employee's information below."}
-            </p>
-          </div>
+          <Input
+            id="joiningDate"
+            name="joiningDate"
+            label="Joining Date"
+            type="date"
+            value={formData.joiningDate}
+            onChange={handleChange}
+            required
+          />
 
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            aria-label="Close form"
-            className="rounded-lg px-2 py-1 text-xl text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+          <Input
+            id="firstName"
+            name="firstName"
+            label="First Name"
+            value={formData.firstName}
+            onChange={handleChange}
+            required
+            maxLength={100}
+            placeholder="e.g. John"
+          />
+
+          <Input
+            id="lastName"
+            name="lastName"
+            label="Last Name"
+            value={formData.lastName}
+            onChange={handleChange}
+            required
+            maxLength={100}
+            placeholder="e.g. Doe"
+          />
+
+          <Input
+            id="email"
+            name="email"
+            label="Email Address"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            placeholder="john.doe@example.com"
+          />
+
+          <Input
+            id="phone"
+            name="phone"
+            label="Phone Number"
+            type="tel"
+            value={formData.phone}
+            onChange={handleChange}
+            placeholder="+1 (555) 000-0000"
+          />
+
+          <Select
+            id="departmentId"
+            name="departmentId"
+            label="Department"
+            value={formData.departmentId}
+            onChange={handleChange}
+            required
           >
-            &times;
-          </button>
+            <option value="">Select department</option>
+            {departments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
+              </option>
+            ))}
+          </Select>
+
+          <Input
+            id="designation"
+            name="designation"
+            label="Designation"
+            value={formData.designation}
+            onChange={handleChange}
+            required
+            maxLength={100}
+            placeholder="e.g. Senior Software Engineer"
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 p-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="employeeCode" className={labelClassName}>
-                Employee Code *
-              </label>
-
-              <input
-                id="employeeCode"
-                name="employeeCode"
-                value={formData.employeeCode}
-                onChange={handleChange}
-                required
-                maxLength={30}
-                placeholder="EMP-001"
-                className={inputClassName}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="joiningDate" className={labelClassName}>
-                Joining Date *
-              </label>
-
-              <input
-                id="joiningDate"
-                name="joiningDate"
-                type="date"
-                value={formData.joiningDate}
-                onChange={handleChange}
-                required
-                className={inputClassName}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="firstName" className={labelClassName}>
-                First Name *
-              </label>
-
-              <input
-                id="firstName"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                required
-                maxLength={100}
-                placeholder="First name"
-                className={inputClassName}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="lastName" className={labelClassName}>
-                Last Name *
-              </label>
-
-              <input
-                id="lastName"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
-                required
-                maxLength={100}
-                placeholder="Last name"
-                className={inputClassName}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className={labelClassName}>
-                Email Address *
-              </label>
-
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                placeholder="employee@example.com"
-                className={inputClassName}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="phone" className={labelClassName}>
-                Phone Number
-              </label>
-
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="Phone number"
-                className={inputClassName}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="departmentId" className={labelClassName}>
-                Department *
-              </label>
-
-              <select
-                id="departmentId"
-                name="departmentId"
-                value={formData.departmentId}
-                onChange={handleChange}
-                required
-                className={inputClassName}
-              >
-                <option value="">Select department</option>
-
-                {departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="designation" className={labelClassName}>
-                Designation *
-              </label>
-
-              <input
-                id="designation"
-                name="designation"
-                value={formData.designation}
-                onChange={handleChange}
-                required
-                maxLength={100}
-                placeholder="e.g. Software Engineer"
-                className={inputClassName}
-              />
-            </div>
+        {error && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
           </div>
+        )}
 
-          {error && (
-            <p
-              role="alert"
-              className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600"
-            >
-              {error}
-            </p>
-          )}
+        <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
 
-          <div className="flex justify-end gap-3 border-t pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={isSubmitting || departments.length === 0}
-              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSubmitting
-                ? isEditing
-                  ? "Saving..."
-                  : "Creating..."
-                : isEditing
-                  ? "Save Changes"
-                  : "Create Employee"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          <Button
+            type="submit"
+            variant="primary"
+            isLoading={isSubmitting}
+            disabled={isSubmitting || departments.length === 0}
+          >
+            {isEditing ? "Save Changes" : "Create Employee"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }

@@ -1,9 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CalendarPlus, Clock, FileText, X } from "lucide-react";
 
 import { LeaveRequestForm } from "@/components/leave/LeaveRequestForm";
 import type { LeaveRequest } from "@/types/leave";
+import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/Table";
 
 interface MyLeaveClientProps {
   employeeId: string;
@@ -31,11 +50,11 @@ interface ApiResponse<T> {
   message?: string;
 }
 
-const statusStyles: Record<LeaveRequest["status"], string> = {
-  pending: "bg-amber-50 text-amber-700",
-  approved: "bg-green-50 text-green-700",
-  rejected: "bg-red-50 text-red-700",
-  cancelled: "bg-gray-100 text-gray-600",
+const statusVariants: Record<LeaveRequest["status"], BadgeVariant> = {
+  pending: "warning",
+  approved: "success",
+  rejected: "danger",
+  cancelled: "neutral",
 };
 
 const formatStatus = (status: LeaveRequest["status"]) =>
@@ -67,38 +86,80 @@ function BalanceCard({
   pendingDays,
   remainingDays,
 }: BalanceCardProps) {
-  return (
-    <div className="rounded-xl border bg-white p-5 shadow-sm">
-      <p className="text-sm font-semibold text-gray-900">{leaveTypeName}</p>
+  const usedRatio =
+    allocatedDays > 0
+      ? Math.min(100, Math.round((usedDays / allocatedDays) * 100))
+      : 0;
 
-      <div className="mt-4 grid grid-cols-2 gap-4">
-        <div>
-          <p className="text-xs text-gray-500">Allocated</p>
-          <p className="mt-1 text-xl font-semibold text-gray-900">
+  return (
+    <Card className="flex flex-col justify-between p-5 transition-shadow hover:shadow-sm">
+      <div>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+            {leaveTypeName}
+          </h3>
+
+          <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+            {allocatedDays} Days Total
+          </span>
+        </div>
+
+        {/* Progress bar showing consumed leave */}
+        <div className="mt-3 space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+            <span>Used: {usedDays}d</span>
+            <span>{usedRatio}% allocated</span>
+          </div>
+
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                usedRatio > 80 ? "bg-amber-500" : "bg-indigo-600"
+              }`}
+              style={{ width: `${usedRatio}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2.5 pt-3 border-t border-slate-100">
+        <div className="rounded-lg bg-slate-50/70 p-2.5">
+          <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+            Used
+          </p>
+          <p className="mt-0.5 text-base font-bold text-slate-800">
+            {usedDays}
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-emerald-50/50 border border-emerald-100/60 p-2.5">
+          <p className="text-[11px] font-medium text-emerald-700 uppercase tracking-wider">
+            Remaining
+          </p>
+          <p className="mt-0.5 text-base font-bold text-emerald-700">
+            {remainingDays}
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-slate-50/70 p-2.5">
+          <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+            Allocated
+          </p>
+          <p className="mt-0.5 text-base font-bold text-slate-800">
             {allocatedDays}
           </p>
         </div>
 
-        <div>
-          <p className="text-xs text-gray-500">Used</p>
-          <p className="mt-1 text-xl font-semibold text-gray-900">{usedDays}</p>
-        </div>
-
-        <div>
-          <p className="text-xs text-gray-500">Pending</p>
-          <p className="mt-1 text-xl font-semibold text-amber-600">
+        <div className="rounded-lg bg-amber-50/50 border border-amber-100/60 p-2.5">
+          <p className="text-[11px] font-medium text-amber-700 uppercase tracking-wider">
+            Pending
+          </p>
+          <p className="mt-0.5 text-base font-bold text-amber-700">
             {pendingDays}
           </p>
         </div>
-
-        <div>
-          <p className="text-xs text-gray-500">Remaining</p>
-          <p className="mt-1 text-xl font-semibold text-green-600">
-            {remainingDays}
-          </p>
-        </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -196,37 +257,41 @@ export default function MyLeaveClient({
     };
 
     document.addEventListener("keydown", handleKeyDown);
-
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [showForm]);
 
   if (isLoading && !employee) {
     return (
-      <div className="rounded-xl border bg-white p-8 text-sm text-gray-500">
-        Loading your leave information...
+      <div className="flex h-64 items-center justify-center rounded-xl border border-slate-200/80 bg-white p-8 text-sm text-slate-500 shadow-xs">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+          <p>Loading your leave information...</p>
+        </div>
       </div>
     );
   }
 
   if (error && !employee) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6">
-        <p className="text-sm text-red-700">{error}</p>
+      <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 shadow-xs">
+        <p className="text-sm font-medium text-rose-700">{error}</p>
 
-        <button
+        <Button
           type="button"
+          variant="danger"
+          size="sm"
           onClick={() => void refreshData()}
-          className="mt-3 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+          className="mt-3"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
 
   if (!employee) {
     return (
-      <div className="rounded-xl border bg-white p-8 text-sm text-gray-500">
+      <div className="rounded-xl border border-slate-200/80 bg-white p-8 text-sm text-slate-500 shadow-xs">
         Employee profile could not be found.
       </div>
     );
@@ -234,54 +299,72 @@ export default function MyLeaveClient({
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">My Leave</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            My Leave
+          </h1>
 
-          <p className="mt-1 text-sm text-gray-500">
-            {employee.firstName} {employee.lastName} · {employee.employeeCode}
+          <p className="mt-1 text-sm text-slate-500">
+            {employee.firstName} {employee.lastName} ·{" "}
+            <span className="font-semibold text-slate-700">
+              {employee.employeeCode}
+            </span>
           </p>
         </div>
 
         {canRequestLeave && (
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={() => setShowForm(true)}
-            className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+            leftIcon={<CalendarPlus className="h-4 w-4" />}
           >
             Request Leave
-          </button>
+          </Button>
         )}
       </div>
 
       {error && (
         <div
           role="alert"
-          className="flex items-center justify-between gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+          className="flex items-center justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs"
         >
-          <p className="text-sm text-red-700">{error}</p>
+          <p>{error}</p>
 
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => void refreshData()}
-            className="shrink-0 text-sm font-medium text-red-700 underline"
+            className="border-rose-300 text-rose-700 hover:bg-rose-100"
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
-      <section>
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Leave Balance</h2>
-
-          <p className="mt-1 text-sm text-gray-500">
-            Your current leave allocation and usage.
+      {/* Leave Balance Section */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">
+            Leave Balances
+          </h2>
+          <p className="text-xs text-slate-500">
+            Your dynamic allocation and remaining days for the active period.
           </p>
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-gray-500">Loading leave balances...</p>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="h-48 animate-pulse rounded-xl border border-slate-200/80 bg-slate-100"
+              />
+            ))}
+          </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {leaveBalances.map((balance) => (
@@ -291,98 +374,103 @@ export default function MyLeaveClient({
         )}
       </section>
 
-      <section>
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Leave Request History
-          </h2>
+      {/* Leave Request History Section */}
+      <section className="space-y-3">
+        <Card>
+          <CardHeader className="border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Leave Request History</CardTitle>
+                <CardDescription className="mt-1">
+                  Track the approval status of your submitted leave
+                  applications.
+                </CardDescription>
+              </div>
 
-          <p className="mt-1 text-sm text-gray-500">
-            Your submitted leave requests.
-          </p>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-          {isLoading ? (
-            <p className="px-5 py-12 text-center text-sm text-gray-500">
-              Loading leave requests...
-            </p>
-          ) : leaveRequests.length === 0 ? (
-            <div className="px-5 py-12 text-center">
-              <p className="text-sm text-gray-500">
-                You have no leave requests.
-              </p>
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                {leaveRequests.length} Total
+              </span>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="border-b bg-gray-50">
-                  <tr>
-                    {[
-                      "Leave Type",
-                      "Start Date",
-                      "End Date",
-                      "Duration",
-                      "Reason",
-                      "Status",
-                    ].map((heading) => (
-                      <th
-                        key={heading}
-                        className="px-5 py-3 font-medium text-gray-600"
-                      >
-                        {heading}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
+          </CardHeader>
 
-                <tbody className="divide-y">
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-12 text-center text-sm text-slate-500">
+                Loading leave requests...
+              </div>
+            ) : leaveRequests.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="No Leave Requests Found"
+                description="You haven't submitted any leave requests yet. Click 'Request Leave' to apply."
+              />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Leave Type</TableHead>
+                    <TableHead>Start Date</TableHead>
+                    <TableHead>End Date</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
                   {leaveRequests.map((request) => (
-                    <tr key={request.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-4 font-medium text-gray-900">
+                    <TableRow key={request.id}>
+                      <TableCell className="font-semibold text-slate-900">
                         {request.leaveTypeId}
-                      </td>
+                      </TableCell>
 
-                      <td className="whitespace-nowrap px-5 py-4 text-gray-600">
+                      <TableCell className="whitespace-nowrap text-slate-600">
                         {formatDate(request.startDate)}
-                      </td>
+                      </TableCell>
 
-                      <td className="whitespace-nowrap px-5 py-4 text-gray-600">
+                      <TableCell className="whitespace-nowrap text-slate-600">
                         {formatDate(request.endDate)}
-                      </td>
+                      </TableCell>
 
-                      <td className="whitespace-nowrap px-5 py-4 text-gray-600">
-                        {formatDuration(request.duration)}
-                      </td>
+                      <TableCell className="whitespace-nowrap text-slate-600">
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5 text-slate-400" />
+                          {formatDuration(request.duration)}
+                        </span>
+                      </TableCell>
 
-                      <td className="max-w-xs px-5 py-4 text-gray-600">
-                        <p className="truncate">{request.reason}</p>
-                      </td>
+                      <TableCell className="max-w-xs text-slate-600">
+                        <p className="truncate" title={request.reason}>
+                          {request.reason}
+                        </p>
+                      </TableCell>
 
-                      <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[request.status]}`}
+                      <TableCell>
+                        <Badge
+                          variant={statusVariants[request.status] ?? "neutral"}
+                          dot
                         >
                           {formatStatus(request.status)}
-                        </span>
-                      </td>
-                    </tr>
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </section>
 
+      {/* Request Leave Modal Dialog */}
       {canRequestLeave && showForm && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 sm:p-6"
           onMouseDown={() => setShowForm(false)}
           role="presentation"
         >
           <div
-            className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl"
+            className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200/80 bg-white shadow-2xl"
             onMouseDown={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -392,9 +480,9 @@ export default function MyLeaveClient({
               type="button"
               onClick={() => setShowForm(false)}
               aria-label="Close leave request form"
-              className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-xl leading-none text-gray-500 shadow-sm transition hover:bg-gray-100 hover:text-gray-900"
+              className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
             >
-              ×
+              <X className="h-4 w-4" />
             </button>
 
             <div id="leave-request-dialog-title">

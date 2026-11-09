@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FilterX,
+  Plus,
+  Search,
+} from "lucide-react";
 
 import { EmployeeDetails } from "@/components/employees/EmployeeDetails";
 import { EmployeeForm } from "@/components/employees/EmployeeForm";
@@ -9,6 +15,12 @@ import { EmployeeTable } from "@/components/employees/EmployeeTable";
 
 import type { Employee, Department } from "@/types/employee";
 import type { PaginatedEmployees } from "@/services/employeeService";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Modal } from "@/components/ui/Modal";
+import { Pagination } from "@/components/ui/Pagination";
 
 interface EmployeeFiltersProps {
   initialEmployees: Employee[];
@@ -153,10 +165,10 @@ export function EmployeeFilters({
 
   const hasFilters = Boolean(
     search ||
-    departmentId ||
-    status ||
-    sortBy !== "name" ||
-    sortOrder !== "asc",
+      departmentId ||
+      status ||
+      sortBy !== "name" ||
+      sortOrder !== "asc",
   );
 
   const clearFilters = () => {
@@ -230,61 +242,55 @@ export function EmployeeFilters({
   };
 
   return (
-    <>
-      <div className="mb-4 flex justify-end">
+    <div className="space-y-5">
+      {/* Action Toolbar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-700">
+            Total Employees:{" "}
+            <span className="font-semibold text-slate-900">{result.total}</span>
+          </p>
+        </div>
+
         {!isDemoViewer && (
-          <button
+          <Button
             type="button"
+            variant="primary"
+            leftIcon={<Plus className="h-4 w-4" />}
             onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
           >
-            <span aria-hidden="true" className="text-lg leading-none">
-              +
-            </span>
             Add Employee
-          </button>
+          </Button>
         )}
       </div>
 
-      <div className="rounded-xl border bg-white p-4 shadow-sm">
+      {/* Filter Card */}
+      <Card className="p-4 sm:p-5">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div className="xl:col-span-2">
-            <label
-              htmlFor="employee-search"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
-            >
-              Search
-            </label>
-
-            <input
+            <Input
               id="employee-search"
               type="search"
+              label="Search Directory"
               value={search}
+              leftIcon={<Search className="h-4 w-4 text-slate-400" />}
               onChange={(event) => {
                 setSearch(event.target.value);
                 setPage(1);
               }}
-              placeholder="Name, email, code or designation..."
-              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400"
+              placeholder="Search by name, email, code or designation..."
             />
           </div>
 
           <div>
-            <label
-              htmlFor="employee-department"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
-            >
-              Department
-            </label>
-
-            <select
+            <Select
               id="employee-department"
+              label="Department"
               value={departmentId}
               onChange={(event) => {
                 setDepartmentId(event.target.value);
                 setPage(1);
               }}
-              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400"
             >
               <option value="">All Departments</option>
               {departments.map((department) => (
@@ -292,47 +298,33 @@ export function EmployeeFilters({
                   {department.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div>
-            <label
-              htmlFor="employee-status"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
-            >
-              Status
-            </label>
-
-            <select
+            <Select
               id="employee-status"
+              label="Status"
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value as Employee["status"] | "");
                 setPage(1);
               }}
-              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400"
             >
               <option value="">All Statuses</option>
               <option value="active">Active</option>
               <option value="on_leave">On Leave</option>
               <option value="inactive">Inactive</option>
               <option value="resigned">Resigned</option>
-            </select>
+            </Select>
           </div>
 
           <div>
-            <label
-              htmlFor="employee-sort"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
-            >
-              Sort By
-            </label>
-
-            <select
+            <Select
               id="employee-sort"
+              label="Sort By"
               value={`${sortBy}-${sortOrder}`}
               onChange={(event) => handleSortChange(event.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400"
             >
               <option value="name-asc">Name A–Z</option>
               <option value="name-desc">Name Z–A</option>
@@ -344,90 +336,90 @@ export function EmployeeFilters({
               <option value="employeeCode-desc">
                 Employee Code — Descending
               </option>
-            </select>
+            </Select>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-gray-500">
+        <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-500">
             {isLoading
-              ? "Loading employees..."
+              ? "Updating employee directory..."
               : `Showing ${
                   result.total === 0
                     ? 0
                     : (result.page - 1) * result.pageSize + 1
                 }–${Math.min(result.page * result.pageSize, result.total)} of ${
                   result.total
-                } employees`}
+                } records`}
           </p>
 
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={clearFilters}
             disabled={!hasFilters}
-            className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            leftIcon={<FilterX className="h-3.5 w-3.5" />}
           >
             Clear Filters
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
+      {/* Notifications */}
       {error && (
-        <p role="alert" className="mt-4 text-sm text-red-600">
-          {error}
-        </p>
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-2xs"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
       )}
 
       {successMessage && (
-        <p
+        <div
           role="status"
-          className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+          className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-2xs"
         >
-          {successMessage}
-        </p>
-      )}
-
-      <div className="mt-6">
-        <EmployeeTable
-          employees={result.data}
-          departments={departments}
-          onView={setSelectedEmployee}
-          onEdit={handleEditEmployee}
-          onDeactivate={setEmployeeToDeactivate}
-          readOnly={isDemoViewer}
-        />
-      </div>
-
-      {result.totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between rounded-xl border bg-white px-4 py-3 shadow-sm">
-          <p className="text-sm text-gray-500">
-            Page {result.page} of {result.totalPages}
-          </p>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-              disabled={isLoading || result.page === 1}
-              className="rounded-lg border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Previous
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setPage((current) => Math.min(result.totalPages, current + 1))
-              }
-              disabled={isLoading || result.page === result.totalPages}
-              className="rounded-lg border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Next
-            </button>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>{successMessage}</span>
           </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage("")}
+            className="text-xs font-semibold hover:underline"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
+      {/* Employee Table */}
+      <EmployeeTable
+        employees={result.data}
+        departments={departments}
+        onView={setSelectedEmployee}
+        onEdit={handleEditEmployee}
+        onDeactivate={setEmployeeToDeactivate}
+        readOnly={isDemoViewer}
+      />
+
+      {/* Pagination */}
+      {result.totalPages > 1 && (
+        <Card className="p-0 overflow-hidden">
+          <Pagination
+            currentPage={result.page}
+            totalPages={result.totalPages}
+            totalRecords={result.total}
+            pageSize={result.pageSize}
+            onPageChange={setPage}
+          />
+        </Card>
+      )}
+
+      {/* Employee Details Modal */}
       {selectedEmployee && (
         <EmployeeDetails
           employee={selectedEmployee}
@@ -438,6 +430,7 @@ export function EmployeeFilters({
         />
       )}
 
+      {/* Add / Edit Employee Modal */}
       {!isDemoViewer && (isCreateModalOpen || editingEmployee) && (
         <EmployeeForm
           departments={departments}
@@ -455,74 +448,62 @@ export function EmployeeFilters({
         />
       )}
 
+      {/* Deactivate Confirmation Modal */}
       {!isDemoViewer && employeeToDeactivate && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !isDeactivating) {
-              setEmployeeToDeactivate(null);
-            }
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            if (!isDeactivating) setEmployeeToDeactivate(null);
           }}
+          title="Deactivate Employee"
+          size="sm"
         >
-          <div
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="deactivate-dialog-title"
-            aria-describedby="deactivate-dialog-description"
-            className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50">
-                  <AlertTriangle size={22} className="text-red-600" />
-                </div>
-
-                <h2
-                  id="deactivate-dialog-title"
-                  className="text-lg font-semibold text-gray-900"
-                >
-                  Deactivate Employee
-                </h2>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600 ring-1 ring-rose-200/60">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-800">
+                  Are you sure you want to deactivate{" "}
+                  <span className="font-semibold text-slate-900">
+                    {employeeToDeactivate.firstName}{" "}
+                    {employeeToDeactivate.lastName}
+                  </span>
+                  ?
+                </p>
+                <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+                  This employee will no longer have active status, but their
+                  employment records, attendance, and leave history will be
+                  safely preserved.
+                </p>
               </div>
             </div>
 
-            <p
-              id="deactivate-dialog-description"
-              className="mt-4 text-sm leading-6 text-gray-600"
-            >
-              Are you sure you want to deactivate{" "}
-              <span className="font-semibold text-gray-900">
-                {employeeToDeactivate.firstName} {employeeToDeactivate.lastName}
-              </span>
-              ? This employee will no longer be active, but their existing
-              records and history will be preserved.
-            </p>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => setEmployeeToDeactivate(null)}
                 disabled={isDeactivating}
-                className="rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="button"
+                variant="danger"
+                size="sm"
+                isLoading={isDeactivating}
                 onClick={() => void handleDeactivateEmployee()}
-                disabled={isDeactivating}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isDeactivating && (
-                  <Loader2 size={16} className="animate-spin" />
-                )}
-                {isDeactivating ? "Deactivating..." : "Deactivate"}
-              </button>
+                {isDeactivating ? "Deactivating..." : "Deactivate Employee"}
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
-    </>
+    </div>
   );
 }

@@ -1,11 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { FilterX } from "lucide-react";
 
 import { employees } from "@/data/employees";
 import { leaveTypes } from "@/data/leaveTypes";
 import { LeaveRequestTable } from "@/components/leave/LeaveRequestTable";
 import type { LeaveRequest } from "@/types/leave";
+import { Card } from "@/components/ui/Card";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
 
 interface LeaveFiltersProps {
   requests: LeaveRequest[];
@@ -69,99 +73,88 @@ export function LeaveFilters({
   };
 
   return (
-    <>
-      <div className="rounded-xl border bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-          <div className="flex-1">
-            <label
-              htmlFor="leave-status"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
-            >
-              Status
-            </label>
-
-            <select
+    <div className="space-y-5">
+      {/* Filters Toolbar Card */}
+      <Card className="p-4 sm:p-5">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <Select
               id="leave-status"
+              label="Leave Status"
               value={status}
               onChange={(event) =>
                 setStatus(event.target.value as LeaveRequest["status"] | "")
               }
-              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400"
             >
               <option value="">All Statuses</option>
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
               <option value="cancelled">Cancelled</option>
-            </select>
+            </Select>
           </div>
 
-          <div className="flex-1">
-            <label
-              htmlFor="leave-type"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
-            >
-              Leave Type
-            </label>
-
-            <select
+          <div>
+            <Select
               id="leave-type"
+              label="Leave Category"
               value={leaveTypeId}
               onChange={(event) => setLeaveTypeId(event.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400"
             >
               <option value="">All Leave Types</option>
-
               {leaveTypes.map((leaveType) => (
                 <option key={leaveType.id} value={leaveType.id}>
                   {leaveType.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
-          <div className="flex-1">
-            <label
-              htmlFor="leave-employee"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
-            >
-              Employee
-            </label>
-
-            <select
+          <div>
+            <Select
               id="leave-employee"
+              label="Filter by Employee"
               value={employeeId}
               onChange={(event) => setEmployeeId(event.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-400"
             >
               <option value="">All Employees</option>
-
               {employees.map((employee) => (
                 <option key={employee.id} value={employee.id}>
                   {employee.firstName} {employee.lastName}
                 </option>
               ))}
-            </select>
-          </div>
-
-          <div>
-            <button
-              type="button"
-              onClick={clearFilters}
-              disabled={!hasFilters}
-              className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Clear Filters
-            </button>
+            </Select>
           </div>
         </div>
 
-        <div className="mt-3 text-sm text-gray-500">
-          Showing {filteredRequests.length} of {requests.length} requests
-        </div>
-      </div>
+        <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-500">
+            Showing{" "}
+            <span className="font-semibold text-slate-800">
+              {filteredRequests.length}
+            </span>{" "}
+            of{" "}
+            <span className="font-semibold text-slate-800">
+              {requests.length}
+            </span>{" "}
+            leave applications
+          </p>
 
-      <div className="mt-6">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearFilters}
+            disabled={!hasFilters}
+            leftIcon={<FilterX className="h-3.5 w-3.5" />}
+          >
+            Clear Filters
+          </Button>
+        </div>
+      </Card>
+
+      {/* Table Card */}
+      <Card className="overflow-hidden p-0">
         <LeaveRequestTable
           requests={filteredRequests}
           onView={handleView}
@@ -169,7 +162,7 @@ export function LeaveFilters({
           onReject={handleReject}
           onCancel={handleCancel}
         />
-      </div>
-    </>
+      </Card>
+    </div>
   );
 }

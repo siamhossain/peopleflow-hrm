@@ -2,6 +2,17 @@ import { employees } from "@/data/employees";
 import { leaveTypes } from "@/data/leaveTypes";
 import { LeaveRequestActions } from "@/components/leave/LeaveRequestActions";
 import type { LeaveRequest } from "@/types/leave";
+import {
+  Table,
+  TableHeader,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@/components/ui/Table";
+import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { CalendarOff } from "lucide-react";
 
 interface LeaveRequestTableProps {
   requests: LeaveRequest[];
@@ -11,11 +22,11 @@ interface LeaveRequestTableProps {
   onCancel: (request: LeaveRequest) => void;
 }
 
-const statusStyles: Record<LeaveRequest["status"], string> = {
-  pending: "bg-amber-50 text-amber-700",
-  approved: "bg-green-50 text-green-700",
-  rejected: "bg-red-50 text-red-700",
-  cancelled: "bg-gray-100 text-gray-600",
+const statusBadgeVariants: Record<LeaveRequest["status"], BadgeVariant> = {
+  pending: "warning",
+  approved: "success",
+  rejected: "danger",
+  cancelled: "neutral",
 };
 
 const formatStatus = (status: LeaveRequest["status"]) => {
@@ -41,105 +52,112 @@ export function LeaveRequestTable({
   onReject,
   onCancel,
 }: LeaveRequestTableProps) {
+  if (requests.length === 0) {
+    return (
+      <EmptyState
+        icon={CalendarOff}
+        title="No leave requests found"
+        description="There are currently no leave requests matching your selected filter criteria."
+      />
+    );
+  }
+
   return (
-    <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1000px] text-left text-sm">
-          <thead className="border-b bg-gray-50">
-            <tr>
-              <th className="px-5 py-3 font-medium text-gray-600">Employee</th>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-[240px]">Employee</TableHead>
+          <TableHead>Leave Type</TableHead>
+          <TableHead>Date Range</TableHead>
+          <TableHead>Duration</TableHead>
+          <TableHead className="max-w-[200px]">Reason</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
 
-              <th className="px-5 py-3 font-medium text-gray-600">
-                Leave Type
-              </th>
+      <TableBody>
+        {requests.map((request) => {
+          const employee = employees.find(
+            (item) => item.id === request.employeeId,
+          );
 
-              <th className="px-5 py-3 font-medium text-gray-600">Date</th>
+          const leaveType = leaveTypes.find(
+            (item) => item.id === request.leaveTypeId,
+          );
 
-              <th className="px-5 py-3 font-medium text-gray-600">Duration</th>
+          const initials = employee
+            ? `${employee.firstName[0] || ""}${employee.lastName[0] || ""}`.toUpperCase()
+            : "??";
 
-              <th className="px-5 py-3 font-medium text-gray-600">Reason</th>
+          return (
+            <TableRow key={request.id} className="group">
+              <TableCell>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 border border-slate-200/80 text-xs font-semibold text-slate-700 select-none shadow-2xs">
+                    {initials}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
+                      {employee
+                        ? `${employee.firstName} ${employee.lastName}`
+                        : "Unknown Employee"}
+                    </p>
+                    <p className="font-mono text-xs text-slate-400 truncate">
+                      {employee?.employeeCode ?? request.employeeId}
+                    </p>
+                  </div>
+                </div>
+              </TableCell>
 
-              <th className="px-5 py-3 font-medium text-gray-600">Status</th>
-
-              <th className="px-5 py-3 font-medium text-gray-600">Action</th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y">
-            {requests.map((request) => {
-              const employee = employees.find(
-                (item) => item.id === request.employeeId,
-              );
-
-              const leaveType = leaveTypes.find(
-                (item) => item.id === request.leaveTypeId,
-              );
-
-              return (
-                <tr key={request.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-4">
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {employee
-                          ? `${employee.firstName} ${employee.lastName}`
-                          : "Unknown Employee"}
-                      </p>
-
-                      <p className="text-xs text-gray-500">
-                        {employee?.employeeCode ?? request.employeeId}
-                      </p>
-                    </div>
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {leaveType?.name ?? "Unknown Leave"}
-                      </p>
-
-                      <p className="text-xs text-gray-500">
-                        {leaveType?.code ?? "—"}
-                      </p>
-                    </div>
-                  </td>
-
-                  <td className="px-5 py-4 whitespace-nowrap text-gray-600">
-                    {formatDateRange(request.startDate, request.endDate)}
-                  </td>
-
-                  <td className="px-5 py-4 text-gray-600">
-                    {formatDuration(request.duration)}
-                  </td>
-
-                  <td className="max-w-[240px] px-5 py-4 text-gray-600">
-                    <p className="truncate">{request.reason}</p>
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                        statusStyles[request.status]
-                      }`}
-                    >
-                      {formatStatus(request.status)}
+              <TableCell>
+                <div className="inline-flex items-center gap-1.5">
+                  <span className="font-medium text-slate-800 text-xs">
+                    {leaveType?.name ?? "General Leave"}
+                  </span>
+                  {leaveType?.code && (
+                    <span className="font-mono text-[11px] text-slate-400">
+                      ({leaveType.code})
                     </span>
-                  </td>
+                  )}
+                </div>
+              </TableCell>
 
-                  <td className="px-5 py-4">
-                    <LeaveRequestActions
-                      request={request}
-                      onView={() => onView(request)}
-                      onApprove={() => onApprove(request)}
-                      onReject={() => onReject(request)}
-                      onCancel={() => onCancel(request)}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+              <TableCell className="whitespace-nowrap font-mono text-xs text-slate-600">
+                {formatDateRange(request.startDate, request.endDate)}
+              </TableCell>
+
+              <TableCell className="text-xs text-slate-600">
+                <span className="inline-flex items-center rounded-md bg-slate-50 border border-slate-200/60 px-2 py-0.5 font-medium text-slate-700">
+                  {formatDuration(request.duration)}
+                </span>
+              </TableCell>
+
+              <TableCell className="max-w-[200px]">
+                <p className="truncate text-xs text-slate-600" title={request.reason}>
+                  {request.reason}
+                </p>
+              </TableCell>
+
+              <TableCell>
+                <Badge variant={statusBadgeVariants[request.status]} dot>
+                  {formatStatus(request.status)}
+                </Badge>
+              </TableCell>
+
+              <TableCell className="text-right">
+                <LeaveRequestActions
+                  request={request}
+                  onView={() => onView(request)}
+                  onApprove={() => onApprove(request)}
+                  onReject={() => onReject(request)}
+                  onCancel={() => onCancel(request)}
+                />
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }

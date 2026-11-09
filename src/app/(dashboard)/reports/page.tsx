@@ -1,10 +1,31 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  AlertCircle,
+  BarChart3,
+  Calendar,
+  CalendarDays,
+  CalendarOff,
+  CheckCircle2,
+  Clock,
+  Hourglass,
+  Loader2,
+  Percent,
+  Sun,
+  UserCheck,
+  Users,
+  UserX,
+  XCircle,
+  Ban,
+} from "lucide-react";
 
 import type { AttendanceRecord } from "@/types/attendance";
 import type { LeaveRequest } from "@/types/leave";
 import type { DashboardStats } from "@/services/dashboardService";
+import { StatCard } from "@/components/ui/StatCard";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 
 const DEFAULT_MONTH = "2026-08";
 
@@ -300,258 +321,392 @@ export default function ReportsPage() {
     };
   }, [attendanceRecords]);
 
-  const reportCards = [
-    {
-      label: "Total Employees",
-      value: stats?.totalEmployees ?? "—",
-    },
-    {
-      label: "Attendance Rate",
-      value: stats ? `${stats.attendanceRate}%` : "—",
-    },
-    {
-      label: "Pending Leave Requests",
-      value: stats?.pendingLeaveRequests ?? "—",
-    },
-    {
-      label: "Approved Leave Requests",
-      value: leaveError
-        ? "—"
-        : leaveRequests.filter((request) => request.status === "approved")
-            .length,
-    },
-    {
-      label: "Rejected Leave Requests",
-      value: leaveError
-        ? "—"
-        : leaveRequests.filter((request) => request.status === "rejected")
-            .length,
-    },
-    {
-      label: "Cancelled Leave Requests",
-      value: leaveError
-        ? "—"
-        : leaveRequests.filter((request) => request.status === "cancelled")
-            .length,
-    },
-  ];
+  const approvedLeaveCount = leaveError
+    ? "—"
+    : leaveRequests.filter((request) => request.status === "approved").length;
+
+  const rejectedLeaveCount = leaveError
+    ? "—"
+    : leaveRequests.filter((request) => request.status === "rejected").length;
+
+  const cancelledLeaveCount = leaveError
+    ? "—"
+    : leaveRequests.filter((request) => request.status === "cancelled").length;
 
   return (
-    <section>
-      <div>
-        <p className="text-sm font-medium text-gray-500">HRM Reports</p>
-
-        <h1 className="mt-1 text-2xl font-bold text-gray-900">Reports</h1>
-
-        <p className="mt-2 text-sm text-gray-600">
-          Overview of employee, attendance, and leave management data.
-        </p>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
+            Analytics & Intelligence
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Reports & Insights
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Consolidated overview of workforce trends, monthly attendance metrics, and leave request distributions.
+          </p>
+        </div>
       </div>
 
+      {/* Error Alerts */}
       {dashboardError && (
         <div
           role="alert"
-          className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 shadow-2xs"
         >
-          Unable to load dashboard statistics: {dashboardError}
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>Unable to load dashboard statistics: {dashboardError}</span>
         </div>
       )}
 
       {leaveError && (
         <div
           role="alert"
-          className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+          className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 shadow-2xs"
         >
-          Unable to load leave-request totals: {leaveError}
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>Unable to load leave-request totals: {leaveError}</span>
         </div>
       )}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {reportCards.map((card) => (
-          <div
-            key={card.label}
-            className="rounded-xl border bg-white p-5 shadow-sm"
-          >
-            <p className="text-sm text-gray-500">{card.label}</p>
+      {/* 6 High-Level Metric Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          label="Total Employees"
+          value={dashboardLoading ? "…" : stats?.totalEmployees ?? "—"}
+          icon={Users}
+          color="indigo"
+          description="Total workforce directory"
+        />
 
-            <p className="mt-2 text-2xl font-bold text-gray-900">
-              {dashboardLoading ? "…" : card.value}
-            </p>
-          </div>
-        ))}
+        <StatCard
+          label="Attendance Rate"
+          value={dashboardLoading ? "…" : stats ? `${stats.attendanceRate}%` : "—"}
+          icon={Percent}
+          color="emerald"
+          description="Average employee presence"
+        />
+
+        <StatCard
+          label="Pending Leave Requests"
+          value={dashboardLoading ? "…" : stats?.pendingLeaveRequests ?? "—"}
+          icon={Hourglass}
+          color="amber"
+          description="Awaiting administrative review"
+        />
+
+        <StatCard
+          label="Approved Leave Requests"
+          value={approvedLeaveCount}
+          icon={CheckCircle2}
+          color="emerald"
+          description="Authorized time-off requests"
+        />
+
+        <StatCard
+          label="Rejected Leave Requests"
+          value={rejectedLeaveCount}
+          icon={XCircle}
+          color="rose"
+          description="Declined applications"
+        />
+
+        <StatCard
+          label="Cancelled Leave Requests"
+          value={cancelledLeaveCount}
+          icon={Ban}
+          color="slate"
+          description="Revoked by applicant or admin"
+        />
       </div>
 
-      <div className="mt-6 rounded-xl border bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      {/* Monthly Attendance Summary Section */}
+      <Card className="p-0 overflow-hidden shadow-xs">
+        <div className="flex flex-col gap-4 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Monthly Attendance Summary
-            </h2>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Attendance overview for {formatMonth(selectedMonth)}.
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-indigo-600" />
+              <h2 className="text-base font-bold text-slate-900">
+                Monthly Attendance Summary
+              </h2>
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Aggregated monthly attendance breakdown for{" "}
+              <span className="font-semibold text-slate-800">
+                {formatMonth(selectedMonth)}
+              </span>
             </p>
           </div>
 
-          <div>
+          <div className="flex items-center gap-2">
             <label
               htmlFor="report-month"
-              className="mb-1.5 block text-sm font-medium text-gray-700"
+              className="text-xs font-medium text-slate-600 whitespace-nowrap"
             >
-              Month
+              Select Month:
             </label>
-
             <input
               id="report-month"
               type="month"
               value={selectedMonth}
               onChange={(event) => setSelectedMonth(event.target.value)}
-              className="rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none focus:border-gray-400"
+              className="h-9 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-xs focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
         </div>
 
-        {attendanceLoading ? (
-          <p className="mt-6 text-sm text-gray-500">
-            Loading monthly attendance…
-          </p>
-        ) : attendanceError ? (
-          <p role="alert" className="mt-6 text-sm text-red-700">
-            {attendanceError}
-          </p>
-        ) : (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-sm text-gray-500">Attendance Rate</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {monthlyAttendance.attendancePercentage}%
+        <div className="p-5 sm:p-6">
+          {attendanceLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <Loader2 className="h-7 w-7 animate-spin text-indigo-600 mb-2" />
+              <p className="text-xs font-medium text-slate-500">
+                Aggregating monthly attendance records...
               </p>
             </div>
+          ) : attendanceError ? (
+            <div
+              role="alert"
+              className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-medium text-rose-700"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{attendanceError}</span>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Metric grid */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-emerald-800">Attendance Rate</p>
+                    <Percent className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-700">
+                    {monthlyAttendance.attendancePercentage}%
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-emerald-600/80">Monthly presence ratio</p>
+                </div>
 
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-sm text-gray-500">Present</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {monthlyAttendance.presentDays}
-              </p>
-            </div>
+                <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">Present Days</p>
+                    <UserCheck className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                    {monthlyAttendance.presentDays}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">On-time presences</p>
+                </div>
 
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-sm text-gray-500">Late</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {monthlyAttendance.lateDays}
-              </p>
-            </div>
+                <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">Late Days</p>
+                    <Clock className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-amber-700">
+                    {monthlyAttendance.lateDays}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Late check-in logs</p>
+                </div>
 
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-sm text-gray-500">Half Day</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {monthlyAttendance.halfDays}
-              </p>
-            </div>
+                <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">Half Day</p>
+                    <Sun className="h-4 w-4 text-sky-600" />
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-sky-700">
+                    {monthlyAttendance.halfDays}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Half-day shifts</p>
+                </div>
 
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-sm text-gray-500">Absent</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {monthlyAttendance.absentDays}
-              </p>
-            </div>
+                <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">Absent Days</p>
+                    <UserX className="h-4 w-4 text-rose-600" />
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-rose-700">
+                    {monthlyAttendance.absentDays}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Unexcused absences</p>
+                </div>
 
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-sm text-gray-500">On Leave</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {monthlyAttendance.leaveDays}
-              </p>
-            </div>
+                <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">On Leave</p>
+                    <CalendarOff className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-purple-700">
+                    {monthlyAttendance.leaveDays}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Approved leaves</p>
+                </div>
 
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-sm text-gray-500">Late Minutes</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {monthlyAttendance.totalLateMinutes}
-              </p>
-            </div>
+                <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">Late Minutes</p>
+                    <Clock className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                    {monthlyAttendance.totalLateMinutes}
+                    <span className="text-xs font-normal text-slate-500 ml-1">min</span>
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Cumulative delay time</p>
+                </div>
 
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-sm text-gray-500">Total Records</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {monthlyAttendance.totalRecords}
-              </p>
+                <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">Total Records</p>
+                    <BarChart3 className="h-4 w-4 text-indigo-600" />
+                  </div>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                    {monthlyAttendance.totalRecords}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Total processed punches</p>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      </Card>
+
+      {/* Two Column Section: Daily Attendance Breakdown & Employee Overview */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Daily Attendance Summary Card */}
+        <Card className="shadow-xs">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Daily Attendance Summary</CardTitle>
+                <CardDescription>
+                  Snapshot for the most recent system attendance date.
+                </CardDescription>
+              </div>
+              <Badge variant="indigo" size="sm">
+                Latest Day
+              </Badge>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            {dashboardLoading ? (
+              <div className="flex items-center justify-center py-8 text-slate-400">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                <span className="text-xs">Loading daily statistics...</span>
+              </div>
+            ) : stats ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
+                    <p className="text-xs text-slate-500">Present</p>
+                    <p className="mt-1 text-xl font-bold text-emerald-700">
+                      {stats.presentToday}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
+                    <p className="text-xs text-slate-500">Late</p>
+                    <p className="mt-1 text-xl font-bold text-amber-700">
+                      {stats.lateToday}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
+                    <p className="text-xs text-slate-500">Half Day</p>
+                    <p className="mt-1 text-xl font-bold text-sky-700">
+                      {stats.halfDayToday}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
+                    <p className="text-xs text-slate-500">Absent</p>
+                    <p className="mt-1 text-xl font-bold text-rose-700">
+                      {stats.absentToday}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
+                    <p className="text-xs text-slate-500">On Leave</p>
+                    <p className="mt-1 text-xl font-bold text-purple-700">
+                      {stats.onLeaveToday}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                  <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                  <span>
+                    Referenced date in database:{" "}
+                    <span className="font-semibold text-slate-700">
+                      {reportDate || "Today"}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">
+                Daily attendance statistics are unavailable.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Employee Overview Card */}
+        <Card className="shadow-xs">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Workforce Overview</CardTitle>
+                <CardDescription>
+                  Organizational employee roster and active status ratio.
+                </CardDescription>
+              </div>
+              <Badge variant="neutral" size="sm">
+                Directory
+              </Badge>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            {dashboardLoading ? (
+              <div className="flex items-center justify-center py-8 text-slate-400">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                <span className="text-xs">Loading employee metrics...</span>
+              </div>
+            ) : stats ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200/60">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {stats.totalEmployees} Registered Personnel
+                      </p>
+                      <p className="text-xs text-slate-500 leading-relaxed mt-0.5">
+                        Active staff members eligible for daily attendance monitoring and leave quotas on {reportDate}.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-100 p-3 text-xs text-slate-600">
+                  <p className="font-medium text-slate-700">System Reporting Note</p>
+                  <p className="mt-0.5 text-slate-500">
+                    Statistics are calculated live from validated database entries and synced across administrative dashboards.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">
+                Employee statistics are unavailable.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
-
-      <div className="mt-6 rounded-xl border bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Daily Attendance Summary
-        </h2>
-
-        {dashboardLoading ? (
-          <p className="mt-4 text-sm text-gray-500">
-            Loading daily attendance…
-          </p>
-        ) : stats ? (
-          <>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              <div>
-                <p className="text-sm text-gray-500">Present</p>
-                <p className="mt-1 text-xl font-semibold text-gray-900">
-                  {stats.presentToday}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-gray-500">Late</p>
-                <p className="mt-1 text-xl font-semibold text-gray-900">
-                  {stats.lateToday}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-gray-500">Half Day</p>
-                <p className="mt-1 text-xl font-semibold text-gray-900">
-                  {stats.halfDayToday}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-gray-500">Absent</p>
-                <p className="mt-1 text-xl font-semibold text-gray-900">
-                  {stats.absentToday}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-gray-500">On Leave</p>
-                <p className="mt-1 text-xl font-semibold text-gray-900">
-                  {stats.onLeaveToday}
-                </p>
-              </div>
-            </div>
-
-            <p className="mt-5 text-xs text-gray-500">
-              Based on the latest attendance date in the system: {reportDate}
-            </p>
-          </>
-        ) : (
-          <p className="mt-4 text-sm text-gray-500">
-            Daily attendance statistics are unavailable.
-          </p>
-        )}
-      </div>
-
-      <div className="mt-6 rounded-xl border bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Employee Overview
-        </h2>
-
-        <p className="mt-2 text-sm text-gray-600">
-          {dashboardLoading
-            ? "Loading employee data…"
-            : stats
-              ? `The database currently contains ${stats.totalEmployees} employees eligible for the selected attendance date.`
-              : "Employee statistics are unavailable."}
-        </p>
-      </div>
-    </section>
+    </div>
   );
 }

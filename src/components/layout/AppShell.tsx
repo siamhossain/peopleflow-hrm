@@ -23,14 +23,18 @@ export function AppShell({
   isDemoViewer = false,
 }: AppShellProps) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 text-slate-900 antialiased">
       <div className="flex min-h-screen">
+        {/* Desktop Sidebar */}
         <Sidebar role={role} />
 
+        {/* Main Content Area */}
         <div className="flex min-w-0 flex-1 flex-col">
           <Header role={role} user={user} isDemoViewer={isDemoViewer} />
 
-          <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+          <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+            <div className="mx-auto max-w-7xl">{children}</div>
+          </main>
         </div>
       </div>
     </div>

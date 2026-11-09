@@ -1,5 +1,15 @@
 import type { Department, Employee } from "@/types/employee";
-import { Eye, Pencil, UserX } from "lucide-react";
+import { Eye, Pencil, UserX, Users } from "lucide-react";
+import {
+  Table,
+  TableHeader,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@/components/ui/Table";
+import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface EmployeeTableProps {
   employees: Employee[];
@@ -10,11 +20,11 @@ interface EmployeeTableProps {
   readOnly?: boolean;
 }
 
-const statusStyles: Record<Employee["status"], string> = {
-  active: "bg-green-50 text-green-700",
-  inactive: "bg-gray-100 text-gray-600",
-  on_leave: "bg-amber-50 text-amber-700",
-  resigned: "bg-red-50 text-red-700",
+const statusBadgeVariants: Record<Employee["status"], BadgeVariant> = {
+  active: "success",
+  inactive: "neutral",
+  on_leave: "warning",
+  resigned: "danger",
 };
 
 const formatStatus = (status: Employee["status"]) =>
@@ -23,12 +33,17 @@ const formatStatus = (status: Employee["status"]) =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-const formatDate = (date: string) =>
-  new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(`${date}T00:00:00`));
+const formatDate = (date: string) => {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(`${date}T00:00:00`));
+  } catch {
+    return date;
+  }
+};
 
 export function EmployeeTable({
   employees,
@@ -38,128 +53,129 @@ export function EmployeeTable({
   onDeactivate,
   readOnly = false,
 }: EmployeeTableProps) {
-  return (
-    <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1000px] text-left text-sm">
-          <thead className="border-b bg-gray-50">
-            <tr>
-              <th className="px-5 py-3 font-medium text-gray-600">Employee</th>
-              <th className="px-5 py-3 font-medium text-gray-600">
-                Employee Code
-              </th>
-              <th className="px-5 py-3 font-medium text-gray-600">
-                Designation
-              </th>
-              <th className="px-5 py-3 font-medium text-gray-600">
-                Department
-              </th>
-              <th className="px-5 py-3 font-medium text-gray-600">
-                Joining Date
-              </th>
-              <th className="px-5 py-3 font-medium text-gray-600">Status</th>
-              <th className="px-5 py-3 font-medium text-gray-600">Actions</th>
-            </tr>
-          </thead>
+  if (employees.length === 0) {
+    return (
+      <div className="rounded-xl border border-slate-200/80 bg-white shadow-xs">
+        <EmptyState
+          icon={Users}
+          title="No employees found"
+          description="We couldn't find any employee records matching your current search or filters."
+        />
+      </div>
+    );
+  }
 
-          <tbody className="divide-y">
-            {employees.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-5 py-12 text-center">
-                  <p className="text-sm font-medium text-gray-900">
-                    No employees found
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Try adjusting your search or filters.
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              employees.map((employee) => (
-                <tr key={employee.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-4">
-                    <div>
-                      <p className="font-medium text-gray-900">
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[280px]">Employee</TableHead>
+            <TableHead>Employee Code</TableHead>
+            <TableHead>Designation</TableHead>
+            <TableHead>Department</TableHead>
+            <TableHead>Joining Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+
+        <TableBody>
+          {employees.map((employee) => {
+            const initials = `${employee.firstName[0] || ""}${
+              employee.lastName[0] || ""
+            }`.toUpperCase();
+
+            const departmentName =
+              departments.find(
+                (department) => department.id === employee.departmentId,
+              )?.name ?? "—";
+
+            return (
+              <TableRow key={employee.id} className="group">
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 border border-indigo-100/80 text-xs font-semibold text-indigo-700 select-none shadow-2xs">
+                      {initials}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
                         {employee.firstName} {employee.lastName}
                       </p>
-                      <p className="text-xs text-gray-500">{employee.email}</p>
+                      <p className="text-xs text-slate-500 truncate">{employee.email}</p>
                     </div>
-                  </td>
+                  </div>
+                </TableCell>
 
-                  <td className="px-5 py-4 text-gray-600">
-                    {employee.employeeCode}
-                  </td>
+                <TableCell className="font-mono text-xs font-medium text-slate-600">
+                  {employee.employeeCode}
+                </TableCell>
 
-                  <td className="px-5 py-4 text-gray-600">
-                    {employee.designation}
-                  </td>
+                <TableCell className="font-medium text-slate-700">
+                  {employee.designation}
+                </TableCell>
 
-                  <td className="px-5 py-4 text-gray-600">
-                    {departments.find(
-                      (department) => department.id === employee.departmentId,
-                    )?.name ?? "—"}
-                  </td>
+                <TableCell className="text-slate-600">
+                  <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                    {departmentName}
+                  </span>
+                </TableCell>
 
-                  <td className="px-5 py-4 whitespace-nowrap text-gray-600">
-                    {formatDate(employee.joiningDate)}
-                  </td>
+                <TableCell className="whitespace-nowrap text-xs text-slate-600">
+                  {formatDate(employee.joiningDate)}
+                </TableCell>
 
-                  <td className="px-5 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                        statusStyles[employee.status]
-                      }`}
+                <TableCell>
+                  <Badge variant={statusBadgeVariants[employee.status]} dot>
+                    {formatStatus(employee.status)}
+                  </Badge>
+                </TableCell>
+
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onView(employee)}
+                      title="View details"
+                      aria-label={`View ${employee.firstName} ${employee.lastName}`}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
                     >
-                      {formatStatus(employee.status)}
-                    </span>
-                  </td>
+                      <Eye className="h-4 w-4" />
+                    </button>
 
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onView(employee)}
-                        title="View employee"
-                        aria-label={`View ${employee.firstName} ${employee.lastName}`}
-                        className="rounded-md p-2 text-gray-500 transition hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <Eye size={18} />
-                      </button>
+                    {!readOnly && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onEdit(employee)}
+                          title="Edit employee"
+                          aria-label={`Edit ${employee.firstName} ${employee.lastName}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
 
-                      {!readOnly && (
-                        <>
+                        {(employee.status === "active" ||
+                          employee.status === "on_leave") && (
                           <button
                             type="button"
-                            onClick={() => onEdit(employee)}
-                            title="Edit employee"
-                            aria-label={`Edit ${employee.firstName} ${employee.lastName}`}
-                            className="rounded-md p-2 text-gray-500 transition hover:bg-amber-50 hover:text-amber-600"
+                            onClick={() => onDeactivate(employee)}
+                            title="Deactivate employee"
+                            aria-label={`Deactivate ${employee.firstName} ${employee.lastName}`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
                           >
-                            <Pencil size={18} />
+                            <UserX className="h-4 w-4" />
                           </button>
-
-                          {(employee.status === "active" ||
-                            employee.status === "on_leave") && (
-                            <button
-                              type="button"
-                              onClick={() => onDeactivate(employee)}
-                              title="Deactivate employee"
-                              aria-label={`Deactivate ${employee.firstName} ${employee.lastName}`}
-                              className="rounded-md p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600"
-                            >
-                              <UserX size={18} />
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </div>
   );
 }

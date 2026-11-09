@@ -10,21 +10,26 @@ export default async function EmployeesPage() {
   const employees = await getEmployees();
 
   return (
-    <section>
-      <div>
-        <p className="text-sm font-medium text-gray-500">Employee Management</p>
-        <h1 className="mt-1 text-2xl font-bold text-gray-900">Employees</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          View and manage employee information.
-        </p>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
+            Workforce Management
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Employees
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            View, filter, and manage employee records, department assignments, and employment status.
+          </p>
+        </div>
       </div>
 
-      <div className="mt-6">
-        <EmployeeFilters
-          initialEmployees={employees}
-          isDemoViewer={isDemoViewer}
-        />
-      </div>
-    </section>
+      <EmployeeFilters
+        initialEmployees={employees}
+        isDemoViewer={isDemoViewer}
+      />
+    </div>
   );
 }
