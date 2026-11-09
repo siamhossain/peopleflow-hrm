@@ -16,11 +16,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "WorkBridge HRM",
-    template: "%s | WorkBridge HRM",
+    default: "PeopleOS HRM",
+    template: "%s | PeopleOS HRM",
   },
   description:
-    "WorkBridge HRM - Human Resource Management System for employee, attendance, and leave management.",
+    "PeopleOS HRM - Human Resource Management System for employee, attendance, and leave management.",
 };
 
 interface RootLayoutProps {

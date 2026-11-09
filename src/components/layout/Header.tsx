@@ -113,7 +113,7 @@ export function Header({ role, user, isDemoViewer = false }: HeaderProps) {
             <Building2 className="h-4 w-4" aria-hidden="true" />
           </div>
           <span className="text-sm font-bold tracking-tight text-slate-900">
-            WorkBridge HRM
+            PeopleOS HRM
           </span>
         </div>
       </div>

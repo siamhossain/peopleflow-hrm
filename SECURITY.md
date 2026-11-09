@@ -1,69 +1,68 @@
-# Betopia HRM — Security Notes
+# Security Policy
 
-## 1. Authentication
+PeopleOS handles workforce records, attendance logs, and personal leave information. Security, data privacy, and access control are fundamental to its architecture.
 
-This assessment uses a **mock session** instead of real authentication.
+---
 
-The current implementation demonstrates different Admin and Employee experiences through `mockSession`.
+## Supported Versions
 
-In production, authentication should be handled by a secure authentication system with server-side session/token validation.
+Only the current active release line receives security updates.
 
-## 2. Authorization
+| Version | Supported          |
+| :------ | :----------------- |
+| 1.0.x   | :white_check_mark: |
+| < 1.0   | :x:                |
 
-The application separates Admin and Employee functionality.
+---
 
-- **Admin** — HR management features such as employees, attendance and leave management.
-- **Employee** — Personal attendance, leave and request features.
+## Security Architecture & Controls
 
-In production, authorization must be enforced **server-side**, not only through frontend route visibility.
+### 1. Authentication & Session Security
+- **Engine**: Powered by Auth.js / NextAuth.js v5 with credential and demo provider adapters.
+- **Password Storage**: Passwords are cryptographically hashed using `bcryptjs` with salt rounds prior to persistence.
+- **Session Protection**: Authenticated sessions are validated server-side on every protected API call and layout render. Client-provided tokens or IDs are never trusted blindly.
+- **Cookie Security**: Secure, HTTP-only, SameSite session cookies prevent client-side script interception (XSS).
 
-## 3. Input Validation
+### 2. Authorization & Role-Based Access Control (RBAC)
+- **Roles**: Enforces three explicit access tiers:
+  - `ADMIN`: Full management capability over personnel records, attendance logs, leave approvals, and system settings.
+  - `EMPLOYEE`: Access strictly confined to own profile, personal attendance history, and personal leave requests.
+  - `DEMO_VIEWER`: Read-only simulated mode with destructive and write mutations blocked.
+- **Server-Side Enforcement**: Role authorization is validated on the server within API route handlers and server actions. UI conditional rendering is treated as a usability enhancement, not a security boundary.
+- **Resource Ownership**: Endpoints verify that the authenticated employee ID matches the target resource being requested or mutated.
 
-Leave requests are validated through the service layer before creation.
+### 3. Database & Query Safety
+- **ORM & Injection Prevention**: All database access is mediated through Prisma ORM with parameterized queries, preventing SQL injection vulnerabilities.
+- **Connection Isolation**: The PostgreSQL connection string (`DATABASE_URL`) is strictly confined to server-side execution and is never bundled in client assets.
+- **Relational Integrity**: Foreign key constraints and transaction boundaries ensure ACID compliance for multi-table updates (e.g. leave quotas and attendance audits).
 
-Validation includes:
+### 4. Input Validation & Business Logic Integrity
+- **Boundary Validation**: Request payloads (dates, strings, enums, quotas) are validated server-side prior to processing.
+- **State Machine Integrity**: Status transitions for leave requests (Pending → Approved / Rejected / Cancelled) are strictly guarded against invalid state jumps.
+- **Concurrency & Duplication Protection**: Overlapping leave applications for identical date ranges are detected and rejected at the service layer.
 
-- Valid date range
-- Required leave reason
-- Employee existence
-- Leave type existence
-- Joining/resignation date restrictions
-- Half-day restrictions
-- Overlapping leave detection
-- Leave balance limits
+### 5. Secrets & Environment Configuration
+- **Isolation**: Production secrets (`AUTH_SECRET`, `DATABASE_URL`) must be supplied via secure environment variables.
+- **Version Control**: Environment files containing real secrets (`.env`, `.env.local`) are excluded from Git via `.gitignore`. An example template (`.env.example`) provides sanitised placeholders.
 
-Keeping these rules in the service layer prevents business rules from being dependent on individual UI components.
+---
 
-## 4. Data Protection
+## Reporting a Vulnerability
 
-The current application uses mock data only and does not store real employee information.
+If you discover a security vulnerability in PeopleOS, please disclose it responsibly. Do not publish or discuss potential vulnerabilities in public issue trackers.
 
-A production implementation should:
+### How to Report
 
-- Avoid exposing sensitive employee information to the client.
-- Validate and sanitize API input.
-- Protect sensitive endpoints.
-- Use HTTPS.
-- Store secrets only in environment variables.
-- Never commit credentials or tokens to Git.
+Please email a detailed vulnerability report privately to the repository maintainer or open a private GitHub Security Advisory.
 
-## 5. Production Authentication & API Security
+Include the following information:
+1. **Description**: Nature and potential impact of the vulnerability.
+2. **Steps to Reproduce**: Detailed step-by-step instructions or proof-of-concept code.
+3. **Affected Endpoints/Components**: Affected routes, APIs, or files.
+4. **Proposed Fix**: Any suggested mitigations or patches (optional).
 
-If connected to a backend, the application should additionally implement:
+### Response Process
 
-- Secure authentication
-- Server-side role/permission checks
-- Protected API routes
-- Secure session management
-- Rate limiting where appropriate
-- Request validation
-- Proper error handling without exposing internal details
-- Database access controls
-
-## 6. Current Assessment Scope
-
-This project intentionally uses mock data and a mock session because the assessment focuses primarily on frontend architecture, business logic, UI implementation and testability.
-
-The current mock implementation should **not be considered production-ready authentication or authorization**.
-
-The service-layer separation allows the mock data source to be replaced with secured backend APIs later without requiring major UI restructuring.
+- **Acknowledgment**: You will receive an acknowledgment within 48 hours.
+- **Assessment**: The maintainer will investigate and determine the severity and scope.
+- **Resolution**: A patch will be developed, tested, and deployed, followed by public acknowledgment if desired.

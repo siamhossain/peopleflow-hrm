@@ -51,7 +51,7 @@ export function Sidebar({ role, mobile = false, onNavigate }: SidebarProps) {
 
             <div className="flex flex-col">
               <span className="text-base font-bold tracking-tight text-slate-900 leading-none">
-                WorkBridge
+                PeopleOS
               </span>
               <span className="text-[10px] font-semibold tracking-wider text-indigo-600 uppercase mt-0.5">
                 HRM Platform
@@ -105,7 +105,7 @@ export function Sidebar({ role, mobile = false, onNavigate }: SidebarProps) {
               {role === "admin" ? "Admin Mode" : "Employee Mode"}
             </span>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              WorkBridge v1.0
+              PeopleOS v1.0
             </p>
           </div>
         </div>
