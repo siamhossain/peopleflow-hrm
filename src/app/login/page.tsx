@@ -32,6 +32,18 @@ export default function LoginPage() {
     try {
       await loginAsDemo();
     } catch (error) {
+      // Auth.js uses redirects after successful sign-in.
+      // Allow Next.js to handle the redirect normally.
+      if (
+        error &&
+        typeof error === "object" &&
+        "digest" in error &&
+        typeof error.digest === "string" &&
+        error.digest.startsWith("NEXT_REDIRECT")
+      ) {
+        throw error;
+      }
+
       console.error("Demo login failed:", error);
       setError("Unable to start the demo. Please try again.");
       setIsLoading(false);
